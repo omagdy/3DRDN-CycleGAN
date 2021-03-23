@@ -12,12 +12,13 @@ def main():
 	N_TRAINING_DATA       = args.n_training_data
 
 	K                     = args.growth_rate
+	WEIGHTS_INIT          = args.weights_init
 	UTILIZE_BIAS          = args.utilize_bias
 	NO_OF_DENSE_BLOCKS    = args.no_of_dense_blocks
 	NO_OF_UNITS_PER_BLOCK = args.no_of_units_per_block
 
 	training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_START,
-	 NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS)
+	 NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
 
 
 if __name__ == '__main__':

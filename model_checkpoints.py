@@ -2,9 +2,9 @@ import tensorflow as tf
 from logger import log
 from model import Generator
 
-def get_generator(PATCH_SIZE, LR_G, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS):
+def get_generator(PATCH_SIZE, LR_G, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT):
     
-    generator_g         = Generator(PATCH_SIZE, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS)
+    generator_g         = Generator(PATCH_SIZE, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
     generator_optimizer = tf.keras.optimizers.Adam(LR_G)
     
     path = "tensor_checkpoints/"

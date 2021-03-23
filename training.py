@@ -39,10 +39,11 @@ def train_step(real_x, real_y):
     return gen_g_super_loss
 
 
-def training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS):
+def training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOCKS,
+                  K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT):
 
-    begin_log = '### Began training at {} with parameters: Starting Epoch={}, Epochs={}, Batch Size={}, Training Data={},\n Learning Rate={}, Loss Function={}, No. of Dense Blocks={}, Growth Rate(K)={}, No. of units per Block={}, Utilize Bias={} \n'.format(time.ctime(),
-     EPOCH_START, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LR_G, LOSS_FUNC, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS)
+    begin_log = '\n### Began training at {} with parameters: Starting Epoch={}, Epochs={}, Batch Size={}, Training Data={}, Learning Rate={},\n Loss Function={}, No. of Dense Blocks={}, Growth Rate(K)={}, No. of units per Block={}, Utilize Bias={}, Weights Initializer={} \n'.format(time.ctime(),
+     EPOCH_START, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LR_G, LOSS_FUNC, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
     
     log(begin_log)
 
@@ -60,7 +61,8 @@ def training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_ST
     log(patch_log)
 
     global generator_g, generator_optimizer, ckpt_manager
-    generator_g, generator_optimizer, ckpt_manager = get_generator(PATCH_SIZE, LR_G, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS)
+    generator_g, generator_optimizer, ckpt_manager = get_generator(PATCH_SIZE, LR_G, NO_OF_DENSE_BLOCKS, K,
+     NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
 
     comparison_image    = 900
     comparison_image_hr = hr_data[comparison_image]
