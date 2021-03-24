@@ -10,7 +10,7 @@ WEIGHTS_INIT_DICT = {"HeUniform"     : tf.keras.initializers.HeUniform(),
 def dense_unit(no_of_filters, f_size, UTILIZE_BIAS, WEIGHTS_INIT, name=None):
     result = tf.keras.Sequential(name=name)
     result.add(tf.keras.layers.BatchNormalization())
-    result.add(tf.keras.layers.ReLU())
+    result.add(tf.keras.layers.LeakyReLU())
 #     result.add(Swish(dtype='float64', trainable=False))    
     result.add(tf.keras.layers.Conv3D(no_of_filters, f_size, kernel_initializer=WEIGHTS_INIT,
                                       use_bias = UTILIZE_BIAS, padding='same', dtype='float64'))
