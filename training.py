@@ -9,17 +9,18 @@ from sklearn.utils import shuffle
 
 from logger import log
 from model import Generator
-from loss_functions import supervised_loss
-from plotting import generate_images, plot_losses
 from data_preparing import get_batch_data
+from loss_functions import supervised_loss
 from model_checkpoints import get_generator, save_generator
+from plotting import generate_images, plot_losses, plot_evaluations
 
 
 def signal_handler(sig, frame):
     stop_log = "The training process was stopped at "+time.ctime()
     log(stop_log)
-    plot_losses(epochs_plot, total_generator_g_error_plot)
-    save_generator(ckpt_manager, "final_epoch")
+    plot_losses(epochs_plot, total_generator_g_error_plot, "stopped")
+    plot_evaluations(epochs_plot, psnr_plot, ssim_plot, "stopped")
+    save_generator(ckpt_manager, "stopping_epoch")
     sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -42,7 +43,7 @@ def train_step(real_x, real_y):
 def training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOCKS,
                   K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT):
 
-    begin_log = '\n### Began training at {} with parameters: Starting Epoch={}, Epochs={}, Batch Size={}, Training Data={}, Learning Rate={},\n Loss Function={}, No. of Dense Blocks={}, Growth Rate(K)={}, No. of units per Block={}, Utilize Bias={}, Weights Initializer={} \n'.format(time.ctime(),
+    begin_log = '\n### Began training at {} with parameters: Starting Epoch={}, Epochs={}, Batch Size={}, Training Data={}, Learning Rate={}, Loss Function={}, No. of Dense Blocks={}, Growth Rate(K)={}, No. of units per Block={}, Utilize Bias={}, Weights Initializer={} \n'.format(time.ctime(),
      EPOCH_START, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LR_G, LOSS_FUNC, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
     
     log(begin_log)
@@ -68,11 +69,15 @@ def training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_ST
     comparison_image_hr = hr_data[comparison_image]
     comparison_image_lr = lr_data[comparison_image]
 
-    generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "a_first_plot")
+    psnr, ssim = generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START))
+    evaluation_log = "Before training: PSNR = "+str(psnr)+", SSIM = "+str(ssim)
+    log(evaluation_log)
 
-    global epochs_plot, total_generator_g_error_plot
+    global epochs_plot, total_generator_g_error_plot, psnr_plot, ssim_plot
     epochs_plot = []
     total_generator_g_error_plot = []
+    psnr_plot = []
+    ssim_plot = []
 
     for epoch in range(EPOCH_START, EPOCH_START+EPOCHS):
 
@@ -96,25 +101,37 @@ def training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_ST
         comparison_image_hr = hr_data[comparison_image]
         comparison_image_lr = lr_data[comparison_image]
 
-        generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "epoch_"+str(epoch) ," Epoch: "+str(epoch) )
+        psnr, ssim = generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "epoch_"+str(epoch) ," Epoch: "+str(epoch) )
         
-        epoch_e_log = "Finished epoch "+str(epoch)+" at "+time.ctime()+". Loss = "+str(generator_loss)+"."
+        psnr_plot.append(psnr)
+        ssim_plot.append(ssim)
+        
+        epoch_e_log = "Finished epoch {} at {}. Loss = {}.".format(epoch, time.ctime(), generator_loss)
         log(epoch_e_log)
+        evaluation_log = "After epoch: PSNR = "+str(psnr)+", SSIM = "+str(ssim)
+        log(evaluation_log)
 
         epoch_seconds = time.time() - epoch_start
-        epoch_t_log = "Epoch took "+str(datetime.timedelta(seconds=epoch_seconds))
+        epoch_t_log = "Epoch took {}".format(datetime.timedelta(seconds=epoch_seconds))
         log(epoch_t_log)
 
         hr_data, lr_data = shuffle(hr_data, lr_data)
         if (epoch + 1) % 50 == 0:
             save_generator(ckpt_manager, epoch)
-            
-    plot_losses(epochs_plot, total_generator_g_error_plot)
-    generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "z_final_plot")
+            plot_losses(epochs_plot, total_generator_g_error_plot, EPOCH_START)
+            plot_evaluations(epochs_plot, psnr_plot, ssim_plot, EPOCH_START)
+
+    plot_losses(epochs_plot, total_generator_g_error_plot, EPOCH_START)
+    plot_evaluations(epochs_plot, psnr_plot, ssim_plot, EPOCH_START)
+
+    psnr, ssim = generate_images(generator_g, comparison_image_lr, comparison_image_hr, PATCH_SIZE, 'z_final_plot_{}'.format(EPOCH_START))
     
-    training_e_log = "Finished training at "+time.ctime()
+    evaluation_log = "After training: PSNR = "+str(psnr)+", SSIM = "+str(ssim)
+    log(evaluation_log)
+    
+    training_e_log = "Finished training at {}".format(time.ctime())
     log(training_e_log)
 
     training_seconds = time.time() - training_start
-    training_t_log = "Training took "+str(datetime.timedelta(seconds=training_seconds))
+    training_t_log = "Training took {}".format(datetime.timedelta(seconds=training_seconds))
     log(training_t_log)
