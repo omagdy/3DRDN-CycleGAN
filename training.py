@@ -51,6 +51,15 @@ def training_loop(lr_train, hr_train, N_TRAINING_DATA, BATCH_SIZE):
     return generator_loss
 
 
+def testing_loop(lr_test, N_TESTING_DATA, BATCH_SIZE, PATCH_SIZE):
+    testing_output_data = np.empty((0,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE,1), 'float64')
+    for i in range(0, N_TESTING_DATA, BATCH_SIZE):        
+        batch_data = get_batch_data(lr_test, i, BATCH_SIZE)
+        testing_output = generator_g(batch_data, training=False).numpy()
+        testing_output_data = np.append(testing_output_data, testing_output , axis=0)
+    return testing_output_data
+
+
 def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOCKS,
                   K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT):
 
@@ -70,7 +79,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
     assert(PATCH_SIZE==PATCH_SIZES[1]==PATCH_SIZES[2])
 
     
-    lr_train, lr_temp, hr_train, hr_temp = train_test_split(lr_data, hr_data, test_size=1-0.1, random_state=42)
+    lr_train, lr_temp, hr_train, hr_temp = train_test_split(lr_data, hr_data, test_size=1-0.5, random_state=42)
     lr_validation, lr_test, hr_validation, hr_test = train_test_split(lr_temp, hr_temp, test_size=0.1, random_state=42)
     
     N_TRAINING_DATA   = lr_train.shape[0]
@@ -112,7 +121,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
 
     for epoch in range(EPOCH_START, EPOCH_START+EPOCHS):
 
-        epoch_s_log = "Began epoch "+str(epoch)+" at "+time.ctime()
+        epoch_s_log = "Began epoch {} at {}".format(epoch, time.ctime())
         log(epoch_s_log)
 
         epoch_start = time.time()
@@ -137,9 +146,10 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
         comparison_image_hr = hr_validation[r_v]
         comparison_image_lr = lr_validation[r_v]
         prediction_image    = generator_g(comparison_image_lr, training=False).numpy()
-        va_psnr, va_ssim = generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START))
+        va_psnr, va_ssim = generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "epoch_{}".format(epoch), " Epoch: {}".format(epoch))
         va_error         = supervised_loss(fix_shape(prediction_image,PATCH_SIZE), fix_shape(comparison_image_hr,PATCH_SIZE)).numpy()
-        
+        va_error = round(va_error,3)
+
         validation_psnr_plot.append(va_psnr)
         validation_ssim_plot.append(va_ssim)
         validation_generator_g_error_plot.append(va_error)
@@ -151,7 +161,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
         epoch_seconds = time.time() - epoch_start
         epoch_t_log = "Epoch took {}".format(datetime.timedelta(seconds=epoch_seconds))
         log(epoch_t_log)
-        evaluation_log = "After epoch: Error = {}, PSNR = {}, SSIM = {}".format(va_error, va_psnr,va_ssim)
+        evaluation_log = "After epoch: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
         log(evaluation_log)
 
         if (epoch + 1) % 50 == 0:
@@ -169,12 +179,27 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
     comparison_image_hr  = hr_test[r_v]
     comparison_image_lr  = lr_test[r_v]
     prediction_image     = generator_g(comparison_image_lr, training=False).numpy()
-    test_psnr, test_ssim = generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, 'z_testing_plot_{}'.format(EPOCH_START))
-    test_error           = supervised_loss(fix_shape(prediction_image,PATCH_SIZE), fix_shape(comparison_image_hr,PATCH_SIZE)).numpy()
-
-    evaluation_log = "After training: Error = {}, PSNR = {}, SSIM = {}".format(test_error, test_psnr, test_ssim)
-    log(evaluation_log)
+    generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, 'z_testing_plot_{}'.format(EPOCH_START))
     
+    if N_TESTING_DATA%BATCH_SIZE != 0:
+        N_TESTING_DATA = N_TESTING_DATA - N_TESTING_DATA%BATCH_SIZE
+        lr_test = lr_test[0:N_TESTING_DATA]
+        hr_test = hr_test[0:N_TESTING_DATA]    
+    test_predictions = testing_loop(lr_test, N_TESTING_DATA, BATCH_SIZE, PATCH_SIZE)
+    
+    test_psnr  = tf.image.psnr(test_predictions.reshape(-1,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE), hr_test.reshape(-1,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE), 1)
+    test_psnr  = test_psnr[test_psnr!=float("inf")]
+    test_psnr  = tf.reduce_mean(test_psnr).numpy()
+    test_psnr  = round(test_psnr,3)
+    test_ssim  = tf.image.ssim(test_predictions.reshape(-1,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE), hr_test.reshape(-1,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE), 1)
+    test_ssim  = tf.reduce_mean(test_ssim).numpy()
+    test_ssim  = round(test_ssim,3)
+    test_error = supervised_loss(test_predictions, hr_test).numpy()
+    test_error = round(test_error,3)
+    
+    #Training Cycle Meta Data Logging
+    evaluation_log = "After training: Error = "+str(test_error)+", PSNR = "+str(test_psnr)+", SSIM = "+str(test_ssim)
+    log(evaluation_log)
     training_e_log = "Finished training at {}".format(time.ctime())
     log(training_e_log)
     training_seconds = time.time() - training_start
