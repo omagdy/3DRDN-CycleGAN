@@ -14,8 +14,6 @@ def training_parser():
     parser.add_argument('-lt', '--loss_type', action='store', default='l1_loss', 
                          type=str, choices=['l1_loss', 'l2_loss'], 
                          help=('Loss type, either L1 (MAE) or L2 (MSE). Default: L1'))
-    parser.add_argument('-ntd', '--n_training_data', action='store', default=810, 
-                         type=int, help=('Number of training data used each epoch. Default: 810'))
     parser.add_argument('-k', '--growth_rate', action='store', default=12, 
                          type=int, help=('Growth rate of the filters for each layer in the dense block. Default: 12'))
     parser.add_argument('-ub', '--utilize_bias', action='store', default=True, 

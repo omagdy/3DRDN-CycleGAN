@@ -19,3 +19,6 @@ def get_batch_data(data, idx, BATCH_SIZE, r_x=0, r_y=0, r_z=0):
         if r_z == 1:
             sub_data[i] = flip_model_z(sub_data[i])
     return sub_data
+
+def fix_shape(data, PATCH_SIZE):
+    return data.reshape(PATCH_SIZE,PATCH_SIZE,PATCH_SIZE)

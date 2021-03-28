@@ -1,5 +1,5 @@
 from arg_parser import training_parser
-from training import training_loop
+from training import main_loop
 
 def main():
 	args = training_parser().parse_args()
@@ -9,7 +9,6 @@ def main():
 	LOSS_FUNC             = args.loss_type
 	BATCH_SIZE            = args.batch_size
 	EPOCH_START           = args.epoch_start
-	N_TRAINING_DATA       = args.n_training_data
 
 	K                     = args.growth_rate
 	WEIGHTS_INIT          = args.weights_init
@@ -17,8 +16,8 @@ def main():
 	NO_OF_DENSE_BLOCKS    = args.no_of_dense_blocks
 	NO_OF_UNITS_PER_BLOCK = args.no_of_units_per_block
 
-	training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_START,
-	 NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
+	main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOCKS,
+	 K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
 
 
 if __name__ == '__main__':
