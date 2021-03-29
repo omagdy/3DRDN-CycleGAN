@@ -127,8 +127,17 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
         epoch_start = time.time()
         
         #TRAINING
-        generator_loss = training_loop(lr_train, hr_train, N_TRAINING_DATA, BATCH_SIZE)
-                
+        try:
+            generator_loss = training_loop(lr_train, hr_train, N_TRAINING_DATA, BATCH_SIZE)
+        except tf.errors.ResourceExhaustedError:
+            oom_error_log = "Encountered OOM Error at {} !".format(time.ctime())
+            log(oom_error_log)
+            save_generator(ckpt_manager, epoch)
+            plot_evaluations(epochs_plot, training_psnr_plot, validation_psnr_plot, training_ssim_plot
+                             , validation_ssim_plot, training_generator_g_error_plot,
+                             validation_generator_g_error_plot, EPOCH_START)
+            return
+
         r_t = np.random.randint(0,N_TRAINING_DATA)
         comparison_image_hr = lr_train[r_t]
         comparison_image_lr = hr_train[r_t]
@@ -164,7 +173,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
         evaluation_log = "After epoch: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
         log(evaluation_log)
 
-        if (epoch + 1) % 50 == 0:
+        if (epoch + 1) % 30 == 0:
             save_generator(ckpt_manager, epoch)
             plot_evaluations(epochs_plot, training_psnr_plot, validation_psnr_plot, training_ssim_plot
                              , validation_ssim_plot, training_generator_g_error_plot,
