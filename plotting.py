@@ -1,6 +1,6 @@
 import random
 import matplotlib.pyplot as plt
-from loss_functions import psnr_and_ssim_loss 
+from loss_functions import psnr_and_ssim_loss, supervised_loss
 
 
 def plot_random_slice(model_patch, r1, r2, PATCH_SIZE):
