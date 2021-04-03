@@ -11,7 +11,7 @@ def plot_random_slice(model_patch, r1, r2, PATCH_SIZE):
         patch_slice = model_patch[:,r2,:]
     else:
         patch_slice = model_patch[:,:,r2]
-    plt.imshow(patch_slice, cmap="gray")
+    plt.imshow(patch_slice, cmap="gray", interpolation="spline36")
     plt.axis('off')
     
     
@@ -30,7 +30,7 @@ def generate_images(prediction, test_input, tar, PATCH_SIZE, figure_name, epoch=
         error = round(supervised_loss(tar, display_list[i]).numpy(), 3)
 #         text = 'PSNR={}\nSSIM={}'.format(psnr,ssim)
         text = 'Error='+str(error)+'\nPSNR='+str(psnr)+'\nSSIM='+str(ssim)
-        plt.text(0.5,-0.25, text, size=20, ha="center", 
+        plt.text(0.5,-0.3, text, size=20, ha="center", 
          transform=ax.transAxes)
         plot_random_slice(display_list[i], r1, r2, PATCH_SIZE)
     # plt.show()
