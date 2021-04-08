@@ -42,7 +42,7 @@ def train_step(real_x, real_y):
     return gen_g_super_loss
 
 
-def training_loop(lr_train, hr_train, N_TRAINING_DATA, BATCH_SIZE):
+def training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE):
     for i in range(0, N_TRAINING_DATA, BATCH_SIZE):
         r = np.random.randint(0,2,3)
         batch_data = get_batch_data(lr_train, i, BATCH_SIZE, r[0], r[1], r[2])
@@ -51,13 +51,36 @@ def training_loop(lr_train, hr_train, N_TRAINING_DATA, BATCH_SIZE):
     return generator_loss
 
 
-def testing_loop(lr_test, N_TESTING_DATA, BATCH_SIZE, PATCH_SIZE):
-    testing_output_data = np.empty((0,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE,1), 'float64')
-    for i in range(0, N_TESTING_DATA, BATCH_SIZE):        
-        batch_data = get_batch_data(lr_test, i, BATCH_SIZE)
-        testing_output = generator_g(batch_data, training=False).numpy()
-        testing_output_data = np.append(testing_output_data, testing_output , axis=0)
-    return testing_output_data
+def evaluation_loop(N_DATA, lr_data, hr_data, PATCH_SIZE, BATCH_SIZE):
+    hr_data, lr_data = shuffle(hr_data, lr_data)
+    if N_DATA%BATCH_SIZE != 0:
+        N_DATA = N_DATA - N_DATA%BATCH_SIZE
+    output_data = np.empty((0,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE,1), 'float64')
+    for i in range(0, N_DATA, BATCH_SIZE):        
+        batch_data = get_batch_data(lr_data, i, BATCH_SIZE)
+        output = generator_g(batch_data, training=False).numpy()
+        output_data = np.append(output_data, output , axis=0)
+    output_data = tf.squeeze(output_data).numpy()
+    hr_data     = tf.squeeze(hr_data).numpy()[0:N_DATA]
+    errors = []
+    psnr  = tf.image.psnr(output_data, hr_data, 1)
+    psnr  = psnr[psnr!=float("inf")]
+    ssim  = tf.image.ssim(output_data, hr_data, 1)
+    for v in [psnr, ssim]:
+        v = tf.reduce_mean(v).numpy()
+        v  = round(v,3)
+        errors.append(v)
+    errors.append(round(supervised_loss(output_data, hr_data).numpy(),3))
+    return errors
+
+
+def generate_random_image_slice(N_DATA, lr_data, hr_data, PATCH_SIZE, str1, str2=""):
+    r_v = np.random.randint(0,N_DATA)
+    comparison_image_lr = lr_data[r_v]
+    prediction_image    = tf.squeeze(generator_g(comparison_image_lr, training=False)).numpy()
+    comparison_image_lr = tf.squeeze(comparison_image_lr).numpy()
+    comparison_image_hr = tf.squeeze(hr_data[r_v]).numpy()
+    generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, str1, str2)
 
 
 def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOCKS,
@@ -70,44 +93,50 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
 
     training_start = time.time()
 
-    lr_data = np.load('data/3d_lr_data.npy') # (N, PATCH_SIZE, PATCH_SIZE, PATCH_SIZE, 1)
-    hr_data = np.load('data/3d_hr_data.npy') # (N, PATCH_SIZE, PATCH_SIZE, PATCH_SIZE, 1)
+    lr_data = np.load('data/3d_lr_data.npy') # Low Resolution Data, Shape  : (N, PATCH_SIZE, PATCH_SIZE, PATCH_SIZE, 1)
+    hr_data = np.load('data/3d_hr_data.npy') # High Resolution Data, Shape : (N, PATCH_SIZE, PATCH_SIZE, PATCH_SIZE, 1)
     
     PATCH_SIZES = hr_data.shape[1:4]         # (PATCH_SIZE, PATCH_SIZE, PATCH_SIZE)
     assert(PATCH_SIZES==lr_data.shape[1:4])
     PATCH_SIZE  = PATCH_SIZES[0]
     assert(PATCH_SIZE==PATCH_SIZES[1]==PATCH_SIZES[2])
 
-    
     lr_train, lr_temp, hr_train, hr_temp = train_test_split(lr_data, hr_data, test_size=1-0.5, random_state=42)
     lr_validation, lr_test, hr_validation, hr_test = train_test_split(lr_temp, hr_temp, test_size=0.1, random_state=42)
     
+    data_splits = [[hr_train, lr_train], [hr_validation, lr_validation], [hr_test, lr_test]]
+    clipped_data_splits = []
+    for i in range(len(data_splits)):
+        data_split = data_splits[i]
+        hr_data = data_split[0]
+        lr_data = data_split[1]
+        n_data  = hr_data.shape[0]
+        if n_data%BATCH_SIZE != 0:
+            n_data = n_data - n_data%BATCH_SIZE
+            lr_data = lr_data[0:n_data]
+            hr_data = hr_data[0:n_data]
+        clipped_data_splits.append([hr_data, lr_data])
+    (hr_train, lr_train),(hr_validation, lr_validation),(hr_test, lr_test) = clipped_data_splits
+
     N_TRAINING_DATA   = lr_train.shape[0]
     N_VALIDATION_DATA = lr_validation.shape[0]
     N_TESTING_DATA    = lr_test.shape[0]
     
-    if N_TRAINING_DATA%BATCH_SIZE != 0:
-        N_TRAINING_DATA = N_TRAINING_DATA - N_TRAINING_DATA%BATCH_SIZE
-        lr_train = lr_train[0:N_TRAINING_DATA]
-        hr_train = hr_train[0:N_TRAINING_DATA]
-        
     no_data_log = "Number of Training Data: {}, Number of Validation Data: {}, Number of Testing Data: {}".format(N_TRAINING_DATA, N_VALIDATION_DATA, N_TESTING_DATA)
     log(no_data_log)
     
     patch_log = "Patch Size is "+str(PATCH_SIZE)
     log(patch_log)
-
+            
     global generator_g, generator_optimizer, ckpt_manager
     generator_g, generator_optimizer, ckpt_manager = get_generator(PATCH_SIZE, LR_G, NO_OF_DENSE_BLOCKS, K,
      NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
+        
+    #Initial Random Slice Image Generation
+    generate_random_image_slice(N_VALIDATION_DATA, lr_validation, hr_validation, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")
+    va_psnr, va_ssim, va_error = evaluation_loop(N_VALIDATION_DATA//30, lr_validation, hr_validation, PATCH_SIZE, BATCH_SIZE)
     
-    r_v = np.random.randint(0,N_VALIDATION_DATA)
-    comparison_image_hr = hr_validation[r_v]
-    comparison_image_lr = lr_validation[r_v]
-    prediction_image = generator_g(comparison_image_lr, training=False).numpy()
-
-    psnr, ssim = generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START))
-    evaluation_log = "Before training: PSNR = "+str(psnr)+", SSIM = "+str(ssim)
+    evaluation_log = "Before training: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
     log(evaluation_log)
 
     global epochs_plot, training_generator_g_error_plot, training_psnr_plot, training_ssim_plot, validation_generator_g_error_plot, validation_psnr_plot, validation_ssim_plot
@@ -128,7 +157,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
         
         #TRAINING
         try:
-            generator_loss = training_loop(lr_train, hr_train, N_TRAINING_DATA, BATCH_SIZE)
+            generator_loss = training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE)
         except tf.errors.ResourceExhaustedError:
             oom_error_log = "Encountered OOM Error at {} !".format(time.ctime())
             log(oom_error_log)
@@ -138,11 +167,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
                              validation_generator_g_error_plot, EPOCH_START)
             return
 
-        r_t = np.random.randint(0,N_TRAINING_DATA)
-        comparison_image_hr = lr_train[r_t]
-        comparison_image_lr = hr_train[r_t]
-        prediction_image = generator_g(comparison_image_lr, training=False).numpy()
-        tr_psnr, tr_ssim = psnr_and_ssim_loss(prediction_image,comparison_image_hr,PATCH_SIZE)
+        tr_psnr, tr_ssim, generator_loss = evaluation_loop(N_TRAINING_DATA//50, lr_train, hr_train, PATCH_SIZE, BATCH_SIZE)
         
         training_generator_g_error_plot.append(generator_loss)
         training_psnr_plot.append(tr_psnr)
@@ -151,13 +176,8 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
         hr_train, lr_train = shuffle(hr_train, lr_train)
         
         #Validation
-        r_v = np.random.randint(0,N_VALIDATION_DATA)
-        comparison_image_hr = hr_validation[r_v]
-        comparison_image_lr = lr_validation[r_v]
-        prediction_image    = generator_g(comparison_image_lr, training=False).numpy()
-        va_psnr, va_ssim = generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, "epoch_{}".format(epoch), " Epoch: {}".format(epoch))
-        va_error         = supervised_loss(fix_shape(prediction_image,PATCH_SIZE), fix_shape(comparison_image_hr,PATCH_SIZE)).numpy()
-        va_error = round(va_error,3)
+        generate_random_image_slice(N_VALIDATION_DATA, lr_validation, hr_validation, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
+        va_psnr, va_ssim, va_error = evaluation_loop(N_VALIDATION_DATA//30, lr_validation, hr_validation, PATCH_SIZE, BATCH_SIZE)
 
         validation_psnr_plot.append(va_psnr)
         validation_ssim_plot.append(va_ssim)
@@ -184,28 +204,9 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
                      validation_generator_g_error_plot, EPOCH_START)
 
     #Testing
-    r_v = np.random.randint(0,N_TESTING_DATA)
-    comparison_image_hr  = hr_test[r_v]
-    comparison_image_lr  = lr_test[r_v]
-    prediction_image     = generator_g(comparison_image_lr, training=False).numpy()
-    generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, 'z_testing_plot_{}'.format(EPOCH_START))
-    
-    if N_TESTING_DATA%BATCH_SIZE != 0:
-        N_TESTING_DATA = N_TESTING_DATA - N_TESTING_DATA%BATCH_SIZE
-        lr_test = lr_test[0:N_TESTING_DATA]
-        hr_test = hr_test[0:N_TESTING_DATA]    
-    test_predictions = testing_loop(lr_test, N_TESTING_DATA, BATCH_SIZE, PATCH_SIZE)
-    
-    test_psnr  = tf.image.psnr(test_predictions.reshape(-1,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE), hr_test.reshape(-1,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE), 1)
-    test_psnr  = test_psnr[test_psnr!=float("inf")]
-    test_psnr  = tf.reduce_mean(test_psnr).numpy()
-    test_psnr  = round(test_psnr,3)
-    test_ssim  = tf.image.ssim(test_predictions.reshape(-1,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE), hr_test.reshape(-1,PATCH_SIZE,PATCH_SIZE,PATCH_SIZE), 1)
-    test_ssim  = tf.reduce_mean(test_ssim).numpy()
-    test_ssim  = round(test_ssim,3)
-    test_error = supervised_loss(test_predictions, hr_test).numpy()
-    test_error = round(test_error,3)
-    
+    generate_random_image_slice(N_TESTING_DATA, lr_test, hr_test, PATCH_SIZE, 'z_testing_plot_{}'.format(EPOCH_START))
+    test_psnr, test_ssim, test_error = evaluation_loop(N_TESTING_DATA, lr_test, hr_test, PATCH_SIZE, BATCH_SIZE)
+        
     #Training Cycle Meta Data Logging
     evaluation_log = "After training: Error = "+str(test_error)+", PSNR = "+str(test_psnr)+", SSIM = "+str(test_ssim)
     log(evaluation_log)
