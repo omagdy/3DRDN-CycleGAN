@@ -75,11 +75,11 @@ def evaluation_loop(N_DATA, lr_data, hr_data, PATCH_SIZE, BATCH_SIZE):
 
 
 def generate_random_image_slice(N_DATA, lr_data, hr_data, PATCH_SIZE, str1, str2=""):
-    r_v = np.random.randint(0,N_DATA)
-    comparison_image_lr = lr_data[r_v]
+    r_v = np.random.randint(0,N_DATA-1)
+    comparison_image_lr = lr_data[r_v:r_v+1]
     prediction_image    = tf.squeeze(generator_g(comparison_image_lr, training=False)).numpy()
     comparison_image_lr = tf.squeeze(comparison_image_lr).numpy()
-    comparison_image_hr = tf.squeeze(hr_data[r_v]).numpy()
+    comparison_image_hr = tf.squeeze(hr_data[r_v:r_v+1]).numpy()
     generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, str1, str2)
 
 
