@@ -9,7 +9,6 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 
 from logger import log
-from model import Generator
 from data_preparing import get_batch_data, fix_shape
 from plotting import generate_images, plot_evaluations
 from model_checkpoints import get_generator, save_generator
@@ -84,10 +83,10 @@ def generate_random_image_slice(N_DATA, lr_data, hr_data, PATCH_SIZE, str1, str2
 
 
 def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOCKS,
-                  K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT):
+                  K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT, ACTIVATION_FUNC):
 
-    begin_log = '\n### Began training at {} with parameters: Starting Epoch={}, Epochs={}, Batch Size={}, Learning Rate={}, Loss Function={}, No. of Dense Blocks={}, Growth Rate(K)={}, No. of units per Block={}, Utilize Bias={}, Weights Initializer={} \n'.format(time.ctime(),
-     EPOCH_START, EPOCHS, BATCH_SIZE, LR_G, LOSS_FUNC, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
+    begin_log = '\n### Began training at {} with parameters: Starting Epoch={}, Epochs={}, Batch Size={}, Learning Rate={}, Loss Function={}, No. of Dense Blocks={}, Growth Rate(K)={}, No. of units per Block={}, Utilize Bias={}, Weights Initializer={}, Activation Function={} \n'.format(time.ctime(),
+     EPOCH_START, EPOCHS, BATCH_SIZE, LR_G, LOSS_FUNC, NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT, ACTIVATION_FUNC)
     
     log(begin_log)
 
@@ -130,7 +129,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
             
     global generator_g, generator_optimizer, ckpt_manager
     generator_g, generator_optimizer, ckpt_manager = get_generator(PATCH_SIZE, LR_G, NO_OF_DENSE_BLOCKS, K,
-     NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT)
+     NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS, WEIGHTS_INIT, ACTIVATION_FUNC)
         
     #Initial Random Slice Image Generation
     generate_random_image_slice(N_VALIDATION_DATA, lr_validation, hr_validation, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")

@@ -25,5 +25,8 @@ def training_parser():
     parser.add_argument('-wi', '--weights_init', action='store', default='HeUniform', 
                          type=str, choices=['HeUniform', 'HeNormal', 'GlorotUniform', 'GlorotNormal'],
                          help=('Initializer for the kernel weights matrix. Default: HeUniform'))
+    parser.add_argument('-af', '--activation_func', action='store', default='LEAKYRELU', 
+                         type=str, choices=['LEAKYRELU', 'SIWSH', 'ELU', 'RELU'],
+                         help=('Activation Function used in the dense blocks. Default: LEAKYRELU'))
 
     return parser
