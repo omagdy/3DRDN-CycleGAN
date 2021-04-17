@@ -133,7 +133,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
         
     #Initial Random Slice Image Generation
     generate_random_image_slice(N_VALIDATION_DATA, lr_validation, hr_validation, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")
-    va_psnr, va_ssim, va_error = evaluation_loop(N_VALIDATION_DATA//30, lr_validation, hr_validation, PATCH_SIZE, BATCH_SIZE)
+    va_psnr, va_ssim, va_error = evaluation_loop(N_VALIDATION_DATA//60, lr_validation, hr_validation, PATCH_SIZE, BATCH_SIZE)
     
     evaluation_log = "Before training: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
     log(evaluation_log)
@@ -166,7 +166,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
                              validation_generator_g_error_plot, EPOCH_START)
             return
 
-        tr_psnr, tr_ssim, generator_loss = evaluation_loop(N_TRAINING_DATA//50, lr_train, hr_train, PATCH_SIZE, BATCH_SIZE)
+        tr_psnr, tr_ssim, generator_loss = evaluation_loop(N_TRAINING_DATA//100, lr_train, hr_train, PATCH_SIZE, BATCH_SIZE)
         
         training_generator_g_error_plot.append(generator_loss)
         training_psnr_plot.append(tr_psnr)
@@ -176,7 +176,7 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, LOSS_FUNC, EPOCH_START, NO_OF_DENSE_BLOC
         
         #Validation
         generate_random_image_slice(N_VALIDATION_DATA, lr_validation, hr_validation, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
-        va_psnr, va_ssim, va_error = evaluation_loop(N_VALIDATION_DATA//30, lr_validation, hr_validation, PATCH_SIZE, BATCH_SIZE)
+        va_psnr, va_ssim, va_error = evaluation_loop(N_VALIDATION_DATA//60, lr_validation, hr_validation, PATCH_SIZE, BATCH_SIZE)
 
         validation_psnr_plot.append(va_psnr)
         validation_ssim_plot.append(va_ssim)

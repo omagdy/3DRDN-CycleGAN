@@ -68,16 +68,13 @@ class G_Model:
         compressor_output = tf.keras.layers.Conv3D(self.compressor_filter_number, self.compressor_filter_size, kernel_initializer=self.WEIGHTS_INIT, 
                                        use_bias=self.UTILIZE_BIAS, padding='same', dtype='float64')(dense_block_output)
         
-        for i in range(self.NO_OF_DENSE_BLOCKS-2):
+        for i in range(self.NO_OF_DENSE_BLOCKS-1):
             dense_block_output = self.dense_block(compressor_output)
             dense_blocks_output.append(dense_block_output)
             dense_block_output = tf.keras.layers.Concatenate(dtype='float64')(dense_blocks_output)
             compressor_output = tf.keras.layers.Conv3D(self.compressor_filter_number, self.compressor_filter_size, kernel_initializer=self.WEIGHTS_INIT, 
                                            use_bias=self.UTILIZE_BIAS, padding='same', dtype='float64')(dense_block_output)
-        dense_block_output = self.dense_block(compressor_output)
-        dense_blocks_output.append(dense_block_output)
-        dense_block_output = tf.keras.layers.Concatenate(dtype='float64')(dense_blocks_output)
         reconstruction_output = tf.keras.layers.Conv3D(1, 1, kernel_initializer=self.WEIGHTS_INIT, 
-                                       use_bias=self.UTILIZE_BIAS, padding='same', dtype='float64')(dense_block_output)
+                                       use_bias=self.UTILIZE_BIAS, padding='same', dtype='float64')(compressor_output)
         final_output =  reconstruction_output + inputs
         return tf.keras.Model(inputs=inputs, outputs=final_output)
