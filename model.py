@@ -9,7 +9,7 @@ class G_Model:
                             "GlorotNormal"  : tf.keras.initializers.GlorotNormal(),}
 
     ACTIVATION_FUNC_DICT = {"SWISH"         : tf.keras.layers.Activation(tf.nn.silu),
-                            "LEAKYRELU"     : tf.keras.layers.LeakyReLU(),
+                            "LEAKYRELU"     : tf.keras.layers.LeakyReLU(alpha=0.2),
                             "RELU"          : tf.keras.layers.ReLU(),
                             "ELU"           : tf.keras.layers.ELU(),}
 
