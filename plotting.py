@@ -24,7 +24,7 @@ class Plots:
         self.valid_ssim.append(v_ssim)
 
     def plot_evaluations(self, EPOCH_START=""):
-        plots      = [[self.train_gen_g_error, self.valid_gen_g_error],
+        plots      = [[self.train_gen_g_loss, self.valid_gen_g_loss],
                       [self.train_psnr, self.valid_psnr], 
                       [self.train_ssim, self.valid_ssim],]
         labels     = [['Training Genreator G Error', 'Validation Genreator G Error'],
