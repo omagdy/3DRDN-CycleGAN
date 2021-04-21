@@ -8,7 +8,7 @@ from sklearn.utils import shuffle
 
 from logger import log
 from model import Model3DRLDSRN
-from plotting import generate_images, plot_evaluations
+from plotting import Plots, generate_images
 from loss_functions import supervised_loss, psnr_and_ssim_loss
 from data_preparing import get_batch_data, data_pre_processing
 
@@ -16,9 +16,7 @@ from data_preparing import get_batch_data, data_pre_processing
 def signal_handler(sig, frame):
     stop_log = "The training process was stopped at {}".format(time.ctime())
     log(stop_log)
-    plot_evaluations(epochs_plot, training_psnr_plot, validation_psnr_plot, training_ssim_plot
-                     , validation_ssim_plot, training_generator_g_error_plot,
-                     validation_generator_g_error_plot, "stopped")
+    plots.plot_evaluations("stopped")
     m.save_models("stopping_epoch")
     sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
@@ -59,7 +57,7 @@ def evaluation_loop(N_DATA, lr_data, hr_data, PATCH_SIZE, BATCH_SIZE):
 def generate_random_image_slice(N_DATA, lr_data, hr_data, PATCH_SIZE, str1, str2=""):
     r_v = np.random.randint(0,N_DATA-1)
     comparison_image_lr = lr_data[r_v:r_v+1]
-    prediction_image    = tf.squeeze(generator_g(comparison_image_lr, training=False)).numpy()
+    prediction_image    = tf.squeeze(m.generator_g(comparison_image_lr, training=False)).numpy()
     comparison_image_lr = tf.squeeze(comparison_image_lr).numpy()
     comparison_image_hr = tf.squeeze(hr_data[r_v:r_v+1]).numpy()
     generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, str1, str2)
@@ -104,14 +102,8 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, EPOCH_START, MODEL):
     evaluation_log = "Before training: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
     log(evaluation_log)
 
-    global epochs_plot, training_generator_g_error_plot, training_psnr_plot, training_ssim_plot, validation_generator_g_error_plot, validation_psnr_plot, validation_ssim_plot
-    epochs_plot = []
-    training_generator_g_error_plot = []
-    training_psnr_plot = []
-    training_ssim_plot = []
-    validation_generator_g_error_plot = []
-    validation_psnr_plot = []
-    validation_ssim_plot = []
+    global plots
+    plots = Plots()
 
     for epoch in range(EPOCH_START, EPOCH_START+EPOCHS):
 
@@ -134,22 +126,13 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, EPOCH_START, MODEL):
 
         tr_psnr, tr_ssim, generator_loss = evaluation_loop(N_TRAINING_DATA//100, lr_train, hr_train, PATCH_SIZE, BATCH_SIZE)
         
-        training_generator_g_error_plot.append(generator_loss)
-        training_psnr_plot.append(tr_psnr)
-        training_ssim_plot.append(tr_ssim)
-        
         hr_train, lr_train = shuffle(hr_train, lr_train)
         
         #Validation
         generate_random_image_slice(N_VALIDATION_DATA, lr_validation, hr_validation, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
         va_psnr, va_ssim, va_error = evaluation_loop(N_VALIDATION_DATA//60, lr_validation, hr_validation, PATCH_SIZE, BATCH_SIZE)
-
-        validation_psnr_plot.append(va_psnr)
-        validation_ssim_plot.append(va_ssim)
-        validation_generator_g_error_plot.append(va_error)
         
         #Epoch Logging
-        epochs_plot.append(epoch)
         epoch_e_log = "Finished epoch {} at {}.".format(epoch, time.ctime())
         log(epoch_e_log)
         epoch_seconds = time.time() - epoch_start
@@ -158,16 +141,15 @@ def main_loop(LR_G, EPOCHS, BATCH_SIZE, EPOCH_START, MODEL):
         evaluation_log = "After epoch: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
         log(evaluation_log)
 
+        #Gather Plotting Data
+        plots.append_plot_data(epoch, generator_loss, tr_psnr, tr_ssim, va_error, va_psnr, va_ssim)
+
         if (epoch + 1) % 30 == 0:
             m.save_models(epoch)
-            plot_evaluations(epochs_plot, training_psnr_plot, validation_psnr_plot, training_ssim_plot
-                             , validation_ssim_plot, training_generator_g_error_plot,
-                             validation_generator_g_error_plot, EPOCH_START)
+            plots.plot_evaluations(EPOCH_START)
             
     m.save_models("last_epoch")
-    plot_evaluations(epochs_plot, training_psnr_plot, validation_psnr_plot, training_ssim_plot
-                     , validation_ssim_plot, training_generator_g_error_plot,
-                     validation_generator_g_error_plot, EPOCH_START)
+    plots.plot_evaluations(EPOCH_START)
 
     #Testing
     generate_random_image_slice(N_TESTING_DATA, lr_test, hr_test, PATCH_SIZE, 'z_testing_plot_{}'.format(EPOCH_START))

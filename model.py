@@ -181,7 +181,7 @@ class Model3DRLDSRN:
             fake_y             = self.generator_g(real_x, training=True)
             gen_g_super_loss   = supervised_loss(real_y, fake_y)
         gradients_of_generator = tape.gradient(gen_g_super_loss, self.generator_g.trainable_variables)
-        m.generator_g_optimizer.apply_gradients(zip(gradients_of_generator, self.generator_g.trainable_variables))
+        self.generator_g_optimizer.apply_gradients(zip(gradients_of_generator, self.generator_g.trainable_variables))
         return gen_g_super_loss
 
     @tf.function
