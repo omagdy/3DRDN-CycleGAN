@@ -152,7 +152,7 @@ class Model3DRLDSRN:
         ckpt = tf.train.Checkpoint(generator_g=self.generator_g, generator_g_optimizer=self.generator_g_optimizer,)
         self.gen_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
         if self.gen_ckpt_manager.latest_checkpoint:
-            ckpt.restore(gen_ckpt_manager.latest_checkpoint)
+            ckpt.restore(self.gen_ckpt_manager.latest_checkpoint)
             log('Generator latest checkpoint restored!!')
         else:
             log("No checkpoint found for generator! Staring from scratch!")
@@ -162,16 +162,17 @@ class Model3DRLDSRN:
             discriminator_y_optimizer=self.discriminator_y_optimizer,)
         self.disc_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
         if self.disc_ckpt_manager.latest_checkpoint:
-            ckpt.restore(disc_ckpt_manager.latest_checkpoint)
+            ckpt.restore(self.disc_ckpt_manager.latest_checkpoint)
             log('Discriminator latest checkpoint restored!!')
         else:
             log("No checkpoint found for discriminator! Staring from scratch!")
 
-    def save_models(self, epoch, gen=True, disc=False):
-        if gen:
-            ckpt_save_path = self.gen_ckpt_manager.save()
-            log('Saving generator checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
-        if disc:
+    def save_models(self, epoch):
+        ckpt_save_path = self.gen_ckpt_manager.save()
+        log('Saving generator checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
+        if self.MODEL=="3DRLDSRN":
+            return
+        else:
             ckpt_save_path = self.disc_ckpt_manager.save()
             log('Saving discriminator checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
         

@@ -27,7 +27,7 @@ def single_model_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, 
         r = np.random.randint(0,2,3)
         batch_data = get_batch_data(lr_train, i, BATCH_SIZE, r[0], r[1], r[2])
         batch_label = get_batch_data(hr_train, i, BATCH_SIZE, r[0], r[1], r[2])
-        if model="gen":
+        if model=="gen":
             loss = m.supervised_train_step(batch_data, batch_label)
         else:
             loss = m.disc_y_train_step(batch_data, batch_label)
@@ -103,7 +103,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN, C
     log(nu_data_log)
          
     global m, plots
-    m = Model3DRLDSRN(PATCH_SIZE=PATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV, LAMBDA_GRD_PEN=LAMBDA_GRD_PEN, MODEL=MODEL)
+    m = Model3DRLDSRN(PATCH_SIZE=PATCH_SIZE, BATCH_SIZE=BATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV, LAMBDA_GRD_PEN=LAMBDA_GRD_PEN, MODEL=MODEL)
     plots = Plots(MODEL)
         
     #Initial Random Slice Image Generation
