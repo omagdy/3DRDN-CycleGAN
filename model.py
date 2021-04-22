@@ -194,7 +194,7 @@ class Model3DRLDSRN:
             total_gen_g_loss = gen_g_super_loss + self.lambda_adv*gen_g_adv_loss
         generator_g_gradient = tape.gradient(total_gen_g_loss, self.generator_g.trainable_variables)
         self.generator_g_optimizer.apply_gradients(zip(generator_g_gradient, self.generator_g.trainable_variables))
-        return total_gen_g_loss
+        return gen_g_adv_loss
     
     @tf.function
     def disc_y_train_step(self, real_x, real_y):

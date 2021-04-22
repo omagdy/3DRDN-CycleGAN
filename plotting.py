@@ -5,7 +5,7 @@ from loss_functions import psnr_and_ssim_loss, supervised_loss
 
 class Plots:
     
-    def __init__(self):
+    def __init__(self, MODEL="3DRLDSRN"):
         self.epochs           = []
         self.train_gen_g_loss = []
         self.train_psnr       = []
@@ -13,8 +13,24 @@ class Plots:
         self.valid_gen_g_loss = []
         self.valid_psnr       = []
         self.valid_ssim       = []
+        self.model = MODEL
+        self.plots      = [[self.train_gen_g_loss, self.valid_gen_g_loss],
+                           [self.train_psnr, self.valid_psnr], 
+                           [self.train_ssim, self.valid_ssim],]
+        self.labels     = [['Training Genreator G Error', 'Validation Genreator G Error'],
+                           ['Training PSNR', 'Validation PSNR'], 
+                           ['Training SSIM', 'Validation SSIM'],]
+        self.file_names = ['losses_plot',
+                           'psnr_evaluation', 
+                           'ssim_evaluation',]
+        if self.model=="WGANGP-3DRLDSRN":
+            self.gen_g_adv_loss = []
+            self.disc_y_adv_loss = []
+            self.plots.append([self.gen_g_adv_loss, self.disc_y_adv_loss])
+            self.labels.append(['Generator G Adversarial Loss', 'Discriminator Y Adversarial Loss'])
+            self.file_names.append('adversarial_g_y_plots')
 
-    def append_plot_data(epoch, t_gen_g_l, t_psnr, t_ssim, v_gen_g_l, v_psnr, v_ssim):
+    def append_plot_data(self, epoch, t_gen_g_l, t_psnr, t_ssim, v_gen_g_l, v_psnr, v_ssim, gen_g_adv_l=0, disc_y_adv_l=0):
         self.epochs.append(epoch)
         self.train_gen_g_loss.append(t_gen_g_l)
         self.train_psnr.append(t_psnr)
@@ -22,18 +38,12 @@ class Plots:
         self.valid_gen_g_loss.append(v_gen_g_l)
         self.valid_psnr.append(v_psnr)
         self.valid_ssim.append(v_ssim)
+        if self.model=="WGANGP-3DRLDSRN":
+            self.gen_g_adv_loss.append(gen_g_adv_l)
+            self.disc_y_adv_loss.append(disc_y_adv_l)
 
     def plot_evaluations(self, EPOCH_START=""):
-        plots      = [[self.train_gen_g_loss, self.valid_gen_g_loss],
-                      [self.train_psnr, self.valid_psnr], 
-                      [self.train_ssim, self.valid_ssim],]
-        labels     = [['Training Genreator G Error', 'Validation Genreator G Error'],
-                      ['Training PSNR', 'Validation PSNR'], 
-                      ['Training SSIM', 'Validation SSIM'],]
-        file_names = ['losses_plot',
-                      'psnr_evaluation', 
-                      'ssim_evaluation',]
-        for plot, label, file_name in zip(plots, labels, file_names):
+        for plot, label, file_name in zip(self.plots, self.labels, self.file_names):
             plt.figure(num=None, figsize=(20, 15), dpi=80, facecolor='w', edgecolor='k')
             plt.plot(self.epochs, plot[0], label =label[0])
             plt.plot(self.epochs, plot[1], label =label[1])
