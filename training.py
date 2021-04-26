@@ -125,6 +125,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN, C
                 generator_loss = single_model_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, model="gen")
             elif MODEL=="WGANGP-3DRLDSRN":
                 if epoch < DISC_ONLY_EPOCHS:
+                    log("Training only the discriminator.")
                     gen_g_adv_loss, disc_y_loss = 0, single_model_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, model="disc")
                 else:
                     gen_g_adv_loss, disc_y_loss = gan_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, CRIT_ITER)
