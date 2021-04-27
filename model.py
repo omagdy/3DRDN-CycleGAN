@@ -1,6 +1,6 @@
 import tensorflow as tf
 from logger import log
-from loss_functions import supervised_loss, generator_loss, discriminator_loss
+from loss_functions import supervised_loss, generator_loss, discriminator_loss, cycle_loss, identity_loss
 
 
 class Generator:
@@ -119,86 +119,164 @@ class Discriminator:
 
 class Model3DRLDSRN:
 
-    def __init__(self, PATCH_SIZE=40, BATCH_SIZE=6, LR_G=1e-4, LR_D=1e-4, LAMBDA_ADV=0.1,
-     LAMBDA_GRD_PEN=10, MODEL="3DRLDSRN"):
+    def __init__(self, PATCH_SIZE=40, BATCH_SIZE=6, LR_G=1e-4, LR_D=1e-4, LAMBDA_ADV=0.01,
+     LAMBDA_GRD_PEN=10, LAMBDA_CYC=0.01, LAMBDA_IDT=0.005, MODEL="3DRLDSRN", CRIT_ITER=3, TRAIN_ONLY=''):
         assert(MODEL in ["3DRLDSRN", "WGANGP-3DRLDSRN", "CYCLE-WGANGP-3DRLDSRN"])
         self.MODEL                 = MODEL
+        self.CRIT_ITER             = CRIT_ITER
+        self.TRAIN_ONLY            = TRAIN_ONLY
+        self.summary_writer = tf.summary.create_file_writer("plots")
         gen                        = Generator(PATCH_SIZE=PATCH_SIZE)
         self.generator_g           = gen.create_generator()
         self.generator_g_optimizer = tf.keras.optimizers.Adam(LR_G)
-        self.load_generator()
-        if MODEL=="WGANGP-3DRLDSRN":
-            disc                           = Discriminator(PATCH_SIZE=PATCH_SIZE)
-            self.discriminator_y           = disc.create_discriminator()
-            self.discriminator_y_optimizer = tf.keras.optimizers.Adam(LR_D)
-            self.lambda_adv                = LAMBDA_ADV
-            self.lambda_grad_pen           = LAMBDA_GRD_PEN
-            self.alpha = tf.random.uniform([BATCH_SIZE, 1, 1, 1, 1], 0, 1, dtype='float64')
-            self.load_discriminator()
+        if MODEL=="3DRLDSRN":
+            self.load_generator_g()
+            return
+        disc                           = Discriminator(PATCH_SIZE=PATCH_SIZE)
+        self.discriminator_y           = disc.create_discriminator()
+        self.discriminator_y_optimizer = tf.keras.optimizers.Adam(LR_D)
+        self.lambda_adv                = LAMBDA_ADV
+        self.lambda_grad_pen           = LAMBDA_GRD_PEN
+        self.alpha = tf.random.uniform([BATCH_SIZE, 1, 1, 1, 1], 0, 1, dtype='float64')
+        if MODEL=="WGANGP-3DRLDSRN": 
+            self.load_discriminator_y()
+            return
         elif MODEL=="CYCLE-WGANGP-3DRLDSRN":
-            disc                           = Discriminator(PATCH_SIZE=PATCH_SIZE)
             self.generator_f               = gen.create_generator()
             self.generator_f_optimizer     = tf.keras.optimizers.Adam(LR_G)
-            self.discriminator_y           = disc.create_discriminator()
             self.discriminator_x           = disc.create_discriminator()
-            self.discriminator_y_optimizer = tf.keras.optimizers.Adam(LR_D)
             self.discriminator_x_optimizer = tf.keras.optimizers.Adam(LR_D)
-            self.lambda_adv                = LAMBDA_ADV
-            self.lambda_grad_pen           = LAMBDA_GRD_PEN
-            self.alpha = tf.random.uniform([BATCH_SIZE, 1, 1, 1, 1], 0, 1, dtype='float64')
-            self.load_discriminator()
+            self.lambda_cyc                = LAMBDA_CYC
+            self.lambda_idt                = LAMBDA_IDT
+            self.load_generator_f()
+            self.load_discriminator_x()
     
-    def load_generator(self, tensor_path = "tensor_checkpoints/generator_checkpoint/"):
-        ckpt = tf.train.Checkpoint(generator_g=self.generator_g, generator_g_optimizer=self.generator_g_optimizer,)
-        self.gen_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
-        if self.gen_ckpt_manager.latest_checkpoint:
-            ckpt.restore(self.gen_ckpt_manager.latest_checkpoint)
-            log('Generator latest checkpoint restored!!')
+    def load_generator_g(self, tensor_path = "tensor_checkpoints/generator_checkpoint/G/"):
+        ckpt = tf.train.Checkpoint(generator_g=self.generator_g, generator_g_optimizer=self.generator_g_optimizer)
+        self.gen_g_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
+        if self.gen_g_ckpt_manager.latest_checkpoint:
+            ckpt.restore(self.gen_g_ckpt_manager.latest_checkpoint)
+            log('Generator G latest checkpoint restored!!')
         else:
-            log("No checkpoint found for generator! Staring from scratch!")
+            log("No checkpoint found for generator G! Staring from scratch!")
 
-    def load_discriminator(self, tensor_path = "tensor_checkpoints/discriminator_checkpoint/"):
-        ckpt = tf.train.Checkpoint(discriminator_y=self.discriminator_y, 
-            discriminator_y_optimizer=self.discriminator_y_optimizer,)
-        self.disc_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
-        if self.disc_ckpt_manager.latest_checkpoint:
-            ckpt.restore(self.disc_ckpt_manager.latest_checkpoint)
-            log('Discriminator latest checkpoint restored!!')
+    def load_generator_f(self, tensor_path = "tensor_checkpoints/generator_checkpoint/F/"):
+        ckpt = tf.train.Checkpoint(generator_f=self.generator_f, generator_f_optimizer=self.generator_f_optimizer)
+        self.gen_f_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
+        if self.gen_f_ckpt_manager.latest_checkpoint:
+            ckpt.restore(self.gen_f_ckpt_manager.latest_checkpoint)
+            log('Generator F latest checkpoint restored!!')
         else:
-            log("No checkpoint found for discriminator! Staring from scratch!")
+            log("No checkpoint found for generator F! Staring from scratch!")
+
+    def load_discriminator_y(self, tensor_path = "tensor_checkpoints/discriminator_checkpoint/Y/"):
+        ckpt = tf.train.Checkpoint(discriminator_y=self.discriminator_y, 
+            discriminator_y_optimizer=self.discriminator_y_optimizer)
+        self.disc_y_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
+        if self.disc_y_ckpt_manager.latest_checkpoint:
+            ckpt.restore(self.disc_y_ckpt_manager.latest_checkpoint)
+            log('Discriminator Y latest checkpoint restored!!')
+        else:
+            log("No checkpoint found for discriminator Y! Staring from scratch!")
+
+    def load_discriminator_x(self, tensor_path = "tensor_checkpoints/discriminator_checkpoint/X/"):
+        ckpt = tf.train.Checkpoint(discriminator_x=self.discriminator_x, 
+            discriminator_x_optimizer=self.discriminator_x_optimizer)
+        self.disc_x_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
+        if self.disc_x_ckpt_manager.latest_checkpoint:
+            ckpt.restore(self.disc_x_ckpt_manager.latest_checkpoint)
+            log('Discriminator X latest checkpoint restored!!')
+        else:
+            log("No checkpoint found for discriminator X! Staring from scratch!")
 
     def save_models(self, epoch):
-        ckpt_save_path = self.gen_ckpt_manager.save()
-        log('Saving generator checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
+        ckpt_save_path = self.gen_g_ckpt_manager.save()
+        log('Saving Generator G checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
         if self.MODEL=="3DRLDSRN":
             return
-        else:
-            ckpt_save_path = self.disc_ckpt_manager.save()
-            log('Saving discriminator checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
+        ckpt_save_path = self.disc_y_ckpt_manager.save()
+        log('Saving Discriminator Y checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
+        if self.MODEL=="WGANGP-3DRLDSRN":
+            return
+        elif self.MODEL=="CYCLE-WGANGP-3DRLDSRN":
+            ckpt_save_path = self.gen_f_ckpt_manager.save()
+            log('Saving Generator F checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
+            ckpt_save_path = self.disc_x_ckpt_manager.save()
+            log('Saving Discriminator X checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
+
         
     @tf.function
-    def supervised_train_step(self, real_x, real_y):
+    def gen_g_supervised_train_step(self, real_x, real_y, epoch):
         with tf.GradientTape(persistent=True) as tape:
             fake_y             = self.generator_g(real_x, training=True)
             gen_g_super_loss   = supervised_loss(real_y, fake_y)
         gradients_of_generator = tape.gradient(gen_g_super_loss, self.generator_g.trainable_variables)
         self.generator_g_optimizer.apply_gradients(zip(gradients_of_generator, self.generator_g.trainable_variables))
-        return gen_g_super_loss
+        with self.summary_writer.as_default():
+            tf.summary.scalar('Generator G Supervised Loss', gen_g_super_loss, step=epoch)
 
     @tf.function
-    def gen_g_train_step(self, real_x, real_y):
+    def gen_f_supervised_train_step(self, real_x, real_y, epoch):
+        with tf.GradientTape(persistent=True) as tape:
+            fake_x             = self.generator_f(real_y, training=True)
+            gen_f_super_loss   = supervised_loss(real_x, fake_x)
+        gradients_of_generator = tape.gradient(gen_f_super_loss, self.generator_f.trainable_variables)
+        self.generator_f_optimizer.apply_gradients(zip(gradients_of_generator, self.generator_f.trainable_variables))
+        with self.summary_writer.as_default():
+            tf.summary.scalar('Generator F Supervised Loss', gen_f_super_loss, step=epoch)
+
+    @tf.function
+    def gen_g_gan_train_step(self, real_x, real_y, epoch):
         with tf.GradientTape(persistent=True) as tape:
             fake_y           = self.generator_g(real_x, training=True)
             disc_fake_y      = self.discriminator_y(fake_y, training=True)
             gen_g_super_loss = supervised_loss(real_y, fake_y)
-            gen_g_adv_loss   = generator_loss(disc_fake_y)
-            total_gen_g_loss = gen_g_super_loss + self.lambda_adv*gen_g_adv_loss
+            gen_g_adv_loss   = self.lambda_adv*generator_loss(disc_fake_y)
+            total_gen_g_loss = gen_g_super_loss + gen_g_adv_loss
         generator_g_gradient = tape.gradient(total_gen_g_loss, self.generator_g.trainable_variables)
         self.generator_g_optimizer.apply_gradients(zip(generator_g_gradient, self.generator_g.trainable_variables))
-        return gen_g_adv_loss
-    
+        with self.summary_writer.as_default():
+            tf.summary.scalar('Generator G Total Loss', total_gen_g_loss, step=epoch)
+            tf.summary.scalar('Generator G Adversarial Loss', gen_g_adv_loss, step=epoch)
+
     @tf.function
-    def disc_y_train_step(self, real_x, real_y):
+    def gen_cycle_train_step(self, real_x, real_y, epoch):
+        with tf.GradientTape(persistent=True) as tape:
+            fake_y           = self.generator_g(real_x, training=True)
+            disc_fake_y      = self.discriminator_y(fake_y, training=True)
+            cycled_x         = self.generator_f(fake_y, training=True)
+            same_y           = self.generator_g(real_y, training=True)
+
+            fake_x           = self.generator_f(real_y, training=True)
+            disc_fake_x      = self.discriminator_x(fake_x, training=True)
+            cycled_y         = self.generator_g(fake_x, training=True)
+            same_x           = self.generator_f(real_x, training=True)
+
+            gen_g_super_loss = supervised_loss(real_y, fake_y)
+            gen_g_adv_loss   = self.lambda_adv*generator_loss(disc_fake_y)
+            gen_g_cycle_loss = self.lambda_cyc*cycle_loss(real_x, cycled_x)
+            gen_g_ident_loss = self.lambda_idt*identity_loss(real_y, same_y)
+
+            gen_f_super_loss = supervised_loss(real_x, fake_x)
+            gen_f_adv_loss   = self.lambda_adv*generator_loss(disc_fake_x)
+            gen_f_cycle_loss = self.lambda_cyc*cycle_loss(real_y, cycled_y)
+            gen_f_ident_loss = self.lambda_idt*identity_loss(real_x, same_x)
+
+            total_gen_g_loss = gen_g_super_loss + gen_g_adv_loss + gen_g_cycle_loss + gen_g_ident_loss
+            total_gen_f_loss = gen_f_super_loss + gen_f_adv_loss + gen_f_cycle_loss + gen_f_ident_loss
+        generator_g_gradient = tape.gradient(total_gen_g_loss, self.generator_g.trainable_variables)
+        generator_f_gradient = tape.gradient(total_gen_f_loss, self.generator_f.trainable_variables)
+        self.generator_g_optimizer.apply_gradients(zip(generator_g_gradient, self.generator_g.trainable_variables))
+        self.generator_f_optimizer.apply_gradients(zip(generator_f_gradient, self.generator_f.trainable_variables))
+        with self.summary_writer.as_default():
+            tf.summary.scalar('Generator G Total Loss', total_gen_g_loss, step=epoch)
+            tf.summary.scalar('Generator G Adversarial Loss', gen_g_adv_loss, step=epoch)
+            tf.summary.scalar('Generator G Cycle Consistency Loss', gen_g_cycle_loss, step=epoch)
+            tf.summary.scalar('Generator G Identity Loss', gen_g_ident_loss, step=epoch)
+            tf.summary.scalar('Generator F Total Loss', total_gen_f_loss, step=epoch)
+
+    @tf.function
+    def disc_y_train_step(self, real_x, real_y, epoch):
         with tf.GradientTape(persistent=True) as tape:
             fake_y         = self.generator_g(real_x, training=True)
             disc_real_y    = self.discriminator_y(real_y, training=True)
@@ -215,4 +293,57 @@ class Model3DRLDSRN:
             total_disc_y_loss    = disc_y_loss + self.lambda_grad_pen*gradient_penalty_y
         discriminator_y_gradient = tape.gradient(total_disc_y_loss, self.discriminator_y.trainable_variables)
         self.discriminator_y_optimizer.apply_gradients(zip(discriminator_y_gradient, self.discriminator_y.trainable_variables))
-        return total_disc_y_loss
+        with self.summary_writer.as_default():
+            tf.summary.scalar('Discriminator Y Total Loss', total_disc_y_loss, step=epoch)
+            tf.summary.scalar('Discriminator Y Adversarial Loss', disc_y_loss, step=epoch)
+
+    @tf.function
+    def disc_x_train_step(self, real_x, real_y, epoch):
+        with tf.GradientTape(persistent=True) as tape:
+            fake_x         = self.generator_f(real_y, training=True)
+            disc_real_x    = self.discriminator_x(real_x, training=True)
+            disc_fake_x    = self.discriminator_x(fake_x, training=True)
+            differences_x  = fake_x - real_x
+            interpolates_x = real_x + (self.alpha*differences_x)
+            with tf.GradientTape() as t:
+                t.watch(interpolates_x)
+                pred_x           = self.discriminator_x(interpolates_x, training=True)
+            gradients_x          = t.gradient(pred_x, [interpolates_x])[0]
+            slopes_x             = tf.sqrt(tf.reduce_sum(tf.square(gradients_x), axis=[1, 2, 3, 4]))
+            gradient_penalty_x   = tf.reduce_mean((slopes_x-1.)**2)
+            disc_x_loss          = discriminator_loss(disc_real_x, disc_fake_x)
+            total_disc_x_loss    = disc_x_loss + self.lambda_grad_pen*gradient_penalty_x
+        discriminator_x_gradient = tape.gradient(total_disc_x_loss, self.discriminator_x.trainable_variables)
+        self.discriminator_x_optimizer.apply_gradients(zip(discriminator_x_gradient, self.discriminator_x.trainable_variables))
+        with self.summary_writer.as_default():
+            tf.summary.scalar('Discriminator X Total Loss', total_disc_x_loss, step=epoch)
+
+    def training(self, real_x, real_y, epoch):
+        if MODEL=="3DRLDSRN":
+            self.gen_g_supervised_train_step(real_x, real_y, epoch)
+            return
+        elif MODEL=="WGANGP-3DRLDSRN":
+            if self.TRAIN_ONLY=="DISCRIMINATORS":
+                self.disc_y_train_step(real_x, real_y, epoch)
+                return
+            else:
+                for _ in range(self.CRIT_ITER):
+                    self.disc_y_train_step(real_x, real_y, epoch)
+                self.gen_g_gan_train_step(real_x, real_y, epoch)
+                return
+        elif MODEL=="CYCLE-WGANGP-3DRLDSRN":
+            if self.TRAIN_ONLY=="GENERATORS":
+                self.gen_g_supervised_train_step(real_x, real_y, epoch)
+                self.gen_f_supervised_train_step(real_x, real_y, epoch)
+                return
+            elif self.TRAIN_ONLY=="DISCRIMINATORS":
+                self.disc_y_train_step(real_x, real_y, epoch)
+                self.disc_x_train_step(real_x, real_y, epoch)
+                return
+            else:
+                for _ in range(self.CRIT_ITER):
+                    self.disc_y_train_step(real_x, real_y, epoch)
+                    self.disc_x_train_step(real_x, real_y, epoch)
+                self.gen_g_supervised_train_step(real_x, real_y, epoch)
+                self.gen_f_supervised_train_step(real_x, real_y, epoch)
+                return

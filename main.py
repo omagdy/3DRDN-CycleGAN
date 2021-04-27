@@ -10,11 +10,14 @@ def main():
 	CRIT_ITER             = args.crit_iter
 	BATCH_SIZE            = args.batch_size
 	LAMBDA_ADV            = args.lambda_adv
+	LAMBDA_IDT            = args.lambda_idt
+	LAMBDA_CYC            = args.lambda_cyc
+	TRAIN_ONLY            = args.train_only
 	EPOCH_START           = args.epoch_start
 	LAMBDA_GRD_PEN        = args.lambda_grd_pen
-	DISC_ONLY_EPOCHS      = args.disc_only_epochs
 
-	main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN, CRIT_ITER, DISC_ONLY_EPOCHS, MODEL)
+	main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
+	 LAMBDA_CYC, LAMBDA_IDT, CRIT_ITER, TRAIN_ONLY, MODEL)
 
 
 if __name__ == '__main__':

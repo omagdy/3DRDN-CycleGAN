@@ -8,7 +8,7 @@ from sklearn.utils import shuffle
 
 from logger import log
 from model import Model3DRLDSRN
-from plotting import Plots, generate_images
+from plotting import generate_images
 from loss_functions import supervised_loss, psnr_and_ssim_loss
 from data_preparing import get_batch_data, data_pre_processing
 
@@ -16,34 +16,17 @@ from data_preparing import get_batch_data, data_pre_processing
 def signal_handler(sig, frame):
     stop_log = "The training process was stopped at {}".format(time.ctime())
     log(stop_log)
-    plots.plot_evaluations("stopped")
     m.save_models("stopping_epoch")
     sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
 
 
-def single_model_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, model="gen"):
+def training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, epoch):
     for i in range(0, N_TRAINING_DATA, BATCH_SIZE):
         r = np.random.randint(0,2,3)
         batch_data = get_batch_data(lr_train, i, BATCH_SIZE, r[0], r[1], r[2])
         batch_label = get_batch_data(hr_train, i, BATCH_SIZE, r[0], r[1], r[2])
-        if model=="gen":
-            loss = m.supervised_train_step(batch_data, batch_label)
-        else:
-            loss = m.disc_y_train_step(batch_data, batch_label)
-    return loss.numpy()
-
-
-def gan_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, critic_iter=7):
-    for i in range(0, N_TRAINING_DATA, BATCH_SIZE):
-        r = np.random.randint(0,2,3)
-        batch_data = get_batch_data(lr_train, i, BATCH_SIZE, r[0], r[1], r[2])
-        batch_label = get_batch_data(hr_train, i, BATCH_SIZE, r[0], r[1], r[2])
-        for _ in range(critic_iter):
-            disc_y_loss = m.disc_y_train_step(batch_data, batch_label)
-        gen_g_adv_loss = m.gen_g_train_step(batch_data, batch_label)
-    return gen_g_adv_loss.numpy(), disc_y_loss.numpy()
-
+        m.training(batch_data, batch_label, epoch)
 
 def evaluation_loop(N_DATA, lr_data, hr_data, PATCH_SIZE, BATCH_SIZE):
     hr_data, lr_data = shuffle(hr_data, lr_data)
@@ -77,10 +60,11 @@ def generate_random_image_slice(N_DATA, lr_data, hr_data, PATCH_SIZE, str1, str2
     generate_images(prediction_image, comparison_image_lr, comparison_image_hr, PATCH_SIZE, str1, str2)
 
 
-def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN, CRIT_ITER, DISC_ONLY_EPOCHS, MODEL):
+def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
+              LAMBDA_CYC, LAMBDA_IDT, CRIT_ITER, TRAIN_ONLY, MODEL):
 
-    begin_log = '\n### Began training {} at {} with parameters: Starting Epoch={}, Epochs={}, Batch Size={}, Learning Rate={}, Lambda Adversarial Loss={}, Lambda Gradient Penalty={}, Critic iterations={}, Discriminator Only Epochs={}\n'.format(MODEL, time.ctime(),
-     EPOCH_START, EPOCHS, BATCH_SIZE, LR, LAMBDA_ADV, LAMBDA_GRD_PEN, CRIT_ITER, DISC_ONLY_EPOCHS)
+    begin_log = '\n### Began training {} at {} with parameters: Starting Epoch={}, Epochs={}, Batch Size={}, Learning Rate={}, Lambda Adversarial Loss={}, Lambda Cycle Loss={}, Lambda Identity Loss={}, Lambda Gradient Penalty={}, Critic iterations={}, Training only={}\n'.format(MODEL, time.ctime(),
+     EPOCH_START, EPOCHS, BATCH_SIZE, LR, LAMBDA_ADV, LAMBDA_CYC, LAMBDA_IDT, LAMBDA_GRD_PEN, CRIT_ITER, TRAIN_ONLY)
     
     log(begin_log)
 
@@ -102,9 +86,10 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN, C
     nu_data_log = "Number of Training Data: {}, Number of Validation Data: {}, Number of Testing Data: {}".format(N_TRAINING_DATA, N_VALIDATION_DATA, N_TESTING_DATA)
     log(nu_data_log)
          
-    global m, plots
-    m = Model3DRLDSRN(PATCH_SIZE=PATCH_SIZE, BATCH_SIZE=BATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV, LAMBDA_GRD_PEN=LAMBDA_GRD_PEN, MODEL=MODEL)
-    plots = Plots(MODEL)
+    global m
+    m = Model3DRLDSRN(PATCH_SIZE=PATCH_SIZE, BATCH_SIZE=BATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV,
+     LAMBDA_GRD_PEN=LAMBDA_GRD_PEN, LAMBDA_CYC=LAMBDA_CYC, LAMBDA_IDT=LAMBDA_IDT, MODEL=MODEL, CRIT_ITER=CRIT_ITER,
+     TRAIN_ONLY=TRAIN_ONLY)
         
     #Initial Random Slice Image Generation
     generate_random_image_slice(N_VALIDATION_DATA, lr_validation, hr_validation, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START))
@@ -121,18 +106,10 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN, C
         
         #TRAINING
         try:
-            if MODEL=="3DRLDSRN":
-                generator_loss = single_model_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, model="gen")
-            elif MODEL=="WGANGP-3DRLDSRN":
-                if epoch < DISC_ONLY_EPOCHS:
-                    log("Training only the discriminator.")
-                    gen_g_adv_loss, disc_y_loss = 0, single_model_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, model="disc")
-                else:
-                    gen_g_adv_loss, disc_y_loss = gan_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, CRIT_ITER)
+            single_model_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, epoch)
         except tf.errors.ResourceExhaustedError:
             log("Encountered OOM Error at {} !".format(time.ctime()))
             m.save_models(epoch)
-            plots.plot_evaluations(EPOCH_START)
             return
 
         tr_psnr, tr_ssim, generator_loss = evaluation_loop(N_TRAINING_DATA//100, lr_train, hr_train, PATCH_SIZE, BATCH_SIZE)
@@ -151,18 +128,10 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN, C
         evaluation_log = "After epoch: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
         log(evaluation_log)
 
-        #Gather Plotting Data
-        if MODEL=="WGANGP-3DRLDSRN":
-            plots.append_plot_data(epoch, generator_loss, tr_psnr, tr_ssim, va_error, va_psnr, va_ssim, gen_g_adv_loss, disc_y_loss)
-        else:
-            plots.append_plot_data(epoch, generator_loss, tr_psnr, tr_ssim, va_error, va_psnr, va_ssim)
-
         if (epoch + 1) % 30 == 0:
             m.save_models(epoch)
-            plots.plot_evaluations(EPOCH_START)
             
     m.save_models("last_epoch")
-    plots.plot_evaluations(EPOCH_START)
 
     #Testing
     generate_random_image_slice(N_TESTING_DATA, lr_test, hr_test, PATCH_SIZE, 'z_testing_plot_{}'.format(EPOCH_START))
