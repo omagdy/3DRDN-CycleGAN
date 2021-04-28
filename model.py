@@ -129,8 +129,8 @@ class Model3DRLDSRN:
         gen                        = Generator(PATCH_SIZE=PATCH_SIZE)
         self.generator_g           = gen.create_generator()
         self.generator_g_optimizer = tf.keras.optimizers.Adam(LR_G)
+        self.load_generator_g()
         if MODEL=="3DRLDSRN":
-            self.load_generator_g()
             return
         disc                           = Discriminator(PATCH_SIZE=PATCH_SIZE)
         self.discriminator_y           = disc.create_discriminator()
@@ -138,8 +138,8 @@ class Model3DRLDSRN:
         self.lambda_adv                = LAMBDA_ADV
         self.lambda_grad_pen           = LAMBDA_GRD_PEN
         self.alpha = tf.random.uniform([BATCH_SIZE, 1, 1, 1, 1], 0, 1, dtype='float64')
+        self.load_discriminator_y()
         if MODEL=="WGANGP-3DRLDSRN": 
-            self.load_discriminator_y()
             return
         elif MODEL=="CYCLE-WGANGP-3DRLDSRN":
             self.generator_f               = gen.create_generator()
@@ -319,10 +319,10 @@ class Model3DRLDSRN:
             tf.summary.scalar('Discriminator X Total Loss', total_disc_x_loss, step=epoch)
 
     def training(self, real_x, real_y, epoch):
-        if MODEL=="3DRLDSRN":
+        if self.MODEL=="3DRLDSRN":
             self.gen_g_supervised_train_step(real_x, real_y, epoch)
             return
-        elif MODEL=="WGANGP-3DRLDSRN":
+        elif self.MODEL=="WGANGP-3DRLDSRN":
             if self.TRAIN_ONLY=="DISCRIMINATORS":
                 self.disc_y_train_step(real_x, real_y, epoch)
                 return
@@ -331,7 +331,7 @@ class Model3DRLDSRN:
                     self.disc_y_train_step(real_x, real_y, epoch)
                 self.gen_g_gan_train_step(real_x, real_y, epoch)
                 return
-        elif MODEL=="CYCLE-WGANGP-3DRLDSRN":
+        elif self.MODEL=="CYCLE-WGANGP-3DRLDSRN":
             if self.TRAIN_ONLY=="GENERATORS":
                 self.gen_g_supervised_train_step(real_x, real_y, epoch)
                 self.gen_f_supervised_train_step(real_x, real_y, epoch)

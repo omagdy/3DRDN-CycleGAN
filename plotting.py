@@ -33,5 +33,5 @@ def generate_images(prediction, test_input, tar, PATCH_SIZE, figure_name, epoch=
          transform=ax.transAxes)
         plot_random_slice(display_list[i], r1, r2)
     # plt.show()
-    plt.savefig('generated_plots/{}.png'.format(figure_name), bbox_inches='tight')
+    plt.savefig('generated_images/{}.png'.format(figure_name), bbox_inches='tight')
     plt.close('all')

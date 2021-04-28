@@ -106,7 +106,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
         
         #TRAINING
         try:
-            single_model_training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, epoch)
+            training_loop(N_TRAINING_DATA, lr_train, hr_train, BATCH_SIZE, epoch)
         except tf.errors.ResourceExhaustedError:
             log("Encountered OOM Error at {} !".format(time.ctime()))
             m.save_models(epoch)
