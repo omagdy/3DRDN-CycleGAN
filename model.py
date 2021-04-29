@@ -153,7 +153,7 @@ class Model3DRLDSRN:
     
     def load_generator_g(self, tensor_path = "tensor_checkpoints/generator_checkpoint/G/"):
         ckpt = tf.train.Checkpoint(generator_g=self.generator_g, generator_g_optimizer=self.generator_g_optimizer)
-        self.gen_g_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
+        self.gen_g_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=1)
         if self.gen_g_ckpt_manager.latest_checkpoint:
             ckpt.restore(self.gen_g_ckpt_manager.latest_checkpoint)
             log('Generator G latest checkpoint restored!!')
@@ -162,7 +162,7 @@ class Model3DRLDSRN:
 
     def load_generator_f(self, tensor_path = "tensor_checkpoints/generator_checkpoint/F/"):
         ckpt = tf.train.Checkpoint(generator_f=self.generator_f, generator_f_optimizer=self.generator_f_optimizer)
-        self.gen_f_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
+        self.gen_f_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=1)
         if self.gen_f_ckpt_manager.latest_checkpoint:
             ckpt.restore(self.gen_f_ckpt_manager.latest_checkpoint)
             log('Generator F latest checkpoint restored!!')
@@ -172,7 +172,7 @@ class Model3DRLDSRN:
     def load_discriminator_y(self, tensor_path = "tensor_checkpoints/discriminator_checkpoint/Y/"):
         ckpt = tf.train.Checkpoint(discriminator_y=self.discriminator_y, 
             discriminator_y_optimizer=self.discriminator_y_optimizer)
-        self.disc_y_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
+        self.disc_y_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=1)
         if self.disc_y_ckpt_manager.latest_checkpoint:
             ckpt.restore(self.disc_y_ckpt_manager.latest_checkpoint)
             log('Discriminator Y latest checkpoint restored!!')
@@ -182,7 +182,7 @@ class Model3DRLDSRN:
     def load_discriminator_x(self, tensor_path = "tensor_checkpoints/discriminator_checkpoint/X/"):
         ckpt = tf.train.Checkpoint(discriminator_x=self.discriminator_x, 
             discriminator_x_optimizer=self.discriminator_x_optimizer)
-        self.disc_x_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=3)
+        self.disc_x_ckpt_manager = tf.train.CheckpointManager(ckpt, tensor_path, max_to_keep=1)
         if self.disc_x_ckpt_manager.latest_checkpoint:
             ckpt.restore(self.disc_x_ckpt_manager.latest_checkpoint)
             log('Discriminator X latest checkpoint restored!!')
