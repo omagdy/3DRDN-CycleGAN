@@ -1,5 +1,4 @@
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
 
 def flip_model_x(model):
     return model[::-1, :, :]
