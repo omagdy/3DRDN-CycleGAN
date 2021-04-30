@@ -344,6 +344,5 @@ class Model3DRLDSRN:
                 for _ in range(self.CRIT_ITER):
                     self.disc_y_train_step(real_x, real_y, epoch)
                     self.disc_x_train_step(real_x, real_y, epoch)
-                self.gen_g_supervised_train_step(real_x, real_y, epoch)
-                self.gen_f_supervised_train_step(real_x, real_y, epoch)
+                self.gen_cycle_train_step(real_x, real_y, epoch)
                 return
