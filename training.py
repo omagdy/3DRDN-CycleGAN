@@ -10,8 +10,8 @@ from sklearn.model_selection import train_test_split
 from logger import log
 from model import Model3DRLDSRN
 from plotting import generate_images
-from data_preprocessing import get_preprocessed_data
 from loss_functions import supervised_loss, psnr_and_ssim_loss
+from data_preprocessing import get_preprocessed_data, PATCH_SIZE
 
 
 def signal_handler(sig, frame):
