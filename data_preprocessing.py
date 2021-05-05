@@ -75,7 +75,7 @@ def extract_patch(lr_image, hr_image):
     r_x, r_y, r_z = get_random_patch_dims(hr_image)
     hr_random_patch = hr_image[r_x:r_x+PATCH_SIZE,r_y:r_y+PATCH_SIZE,r_z:r_z+PATCH_SIZE]
     lr_random_patch = lr_image[r_x:r_x+PATCH_SIZE,r_y:r_y+PATCH_SIZE,r_z:r_z+PATCH_SIZE]
-    return lr_random_patch, hr_random_patch
+    return tf.expand_dims(lr_random_patch, axis=4), tf.expand_dims(hr_random_patch, axis=4)
 
 def get_preprocessed_data(BATCH_SIZE):
     nii_files = glob.glob("data/**/*.nii", recursive=True)
@@ -92,7 +92,7 @@ def get_preprocessed_data(BATCH_SIZE):
     dataset  = dataset.map( lambda x,y: tf.numpy_function(func=extract_patch, inp=[x,y], Tout=(tf.float64, tf.float64)),
                              num_parallel_calls=AUTOTUNE, deterministic=False)
     
-    sample_image  = dataset.take(30).cache('cache/sample_image')
+    sample_image  = dataset.take(30).batch(1).cache('cache/sample_image')
     for l,h in sample_image: # Iterating until all sample images are cached
         pass
     sample_image  = sample_image.shuffle(30).take(1).repeat().as_numpy_iterator()
