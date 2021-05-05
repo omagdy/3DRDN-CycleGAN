@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from logger import log
 from model import Model3DRLDSRN
 from plotting import generate_images
-from data_preparing import data_pre_processing
+from data_preprocessing import get_preprocessed_data
 from loss_functions import supervised_loss, psnr_and_ssim_loss
 
 
@@ -61,26 +61,15 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
 
     training_start = time.time()
 
-    lr_data = np.load('data/3d_lr_data.npy') # Low Resolution Data, Shape  : (N, PATCH_SIZE, PATCH_SIZE, PATCH_SIZE, 1)
-    hr_data = np.load('data/3d_hr_data.npy') # High Resolution Data, Shape : (N, PATCH_SIZE, PATCH_SIZE, PATCH_SIZE, 1)
-    
-    PATCH_SIZES = hr_data.shape[1:4]         # (PATCH_SIZE, PATCH_SIZE, PATCH_SIZE)
-    assert(PATCH_SIZES==lr_data.shape[1:4])
-    PATCH_SIZE  = PATCH_SIZES[0]
-    assert(PATCH_SIZE==PATCH_SIZES[1]==PATCH_SIZES[2])
-    log("Patch Size is "+str(PATCH_SIZE))
+    log("Setting up Data Pipeline")
+    train_dataset, sample_image, valid_dataset, test_dataset = get_preprocessed_data(BATCH_SIZE)
+    pipeline_seconds = time.time() - training_start
+    pipeline_t_log = "Pipeline took {} to set up".format(datetime.timedelta(seconds=pipeline_seconds))
+    log(pipeline_t_log)
 
-    lr_train, lr_temp, hr_train, hr_temp = train_test_split(lr_data, hr_data, test_size=1-0.5, random_state=42)
-    lr_validation, lr_test, hr_validation, hr_test = train_test_split(lr_temp, hr_temp, test_size=0.1, random_state=42)
-
-    train_dataset = data_pre_processing(lr_train, hr_train, BATCH_SIZE)
-    valid_dataset = data_pre_processing(lr_validation, hr_validation, BATCH_SIZE)
-    sample_image  = data_pre_processing(lr_validation, hr_validation, 1).take(1).repeat().as_numpy_iterator()
-    test_dataset  = data_pre_processing(lr_test, hr_test, BATCH_SIZE)
-
-    N_TRAINING_DATA   = train_dataset.__len__().numpy()*BATCH_SIZE
-    N_VALIDATION_DATA = valid_dataset.__len__().numpy()*BATCH_SIZE
-    N_TESTING_DATA    = test_dataset.__len__().numpy()*BATCH_SIZE
+    N_TRAINING_DATA   = train_dataset.cardinality().numpy()*BATCH_SIZE
+    N_VALIDATION_DATA = valid_dataset.cardinality().numpy()*BATCH_SIZE
+    N_TESTING_DATA    = test_dataset.cardinality().numpy()*BATCH_SIZE
     
     nu_data_log = "Number of Training Data: {}, Number of Validation Data: {}, Number of Testing Data: {}".format(N_TRAINING_DATA, N_VALIDATION_DATA, N_TESTING_DATA)
     log(nu_data_log)
@@ -92,7 +81,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
         
     #Initial Random Slice Image Generation
     generate_random_image_slice(sample_image, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")
-    va_psnr, va_ssim, va_error = evaluation_loop(valid_dataset.take(3), PATCH_SIZE)
+    va_psnr, va_ssim, va_error = evaluation_loop(valid_dataset, PATCH_SIZE)
 
     evaluation_log = "Before training: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
     log(evaluation_log)    
@@ -111,12 +100,15 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
             log("Encountered OOM Error at {} !".format(time.ctime()))
             m.save_models(epoch)
             return
-
-        tr_psnr, tr_ssim, generator_loss = evaluation_loop(train_dataset.take(1), PATCH_SIZE)
                 
         #Validation
         generate_random_image_slice(sample_image, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
-        va_psnr, va_ssim, va_error = evaluation_loop(valid_dataset.take(3), PATCH_SIZE)
+        va_psnr, va_ssim, va_error = evaluation_loop(valid_dataset, PATCH_SIZE)
+
+        with m.summary_writer.as_default():
+            tf.summary.scalar('Validation PSNR', va_psnr, step=epoch)
+            tf.summary.scalar('Validation SSIM', va_ssim, step=epoch)
+            tf.summary.scalar('Validation Error', va_error, step=epoch)
         
         #Epoch Logging
         log("Finished epoch {} at {}.".format(epoch, time.ctime()))
