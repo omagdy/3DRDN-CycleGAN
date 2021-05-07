@@ -75,40 +75,49 @@ def extract_patch(lr_image, hr_image):
     r_x, r_y, r_z = get_random_patch_dims(hr_image)
     hr_random_patch = hr_image[r_x:r_x+PATCH_SIZE,r_y:r_y+PATCH_SIZE,r_z:r_z+PATCH_SIZE]
     lr_random_patch = lr_image[r_x:r_x+PATCH_SIZE,r_y:r_y+PATCH_SIZE,r_z:r_z+PATCH_SIZE]
-    return tf.expand_dims(lr_random_patch, axis=4), tf.expand_dims(hr_random_patch, axis=4)
+    return tf.expand_dims(lr_random_patch, axis=3), tf.expand_dims(hr_random_patch, axis=3)
 
 def get_preprocessed_data(BATCH_SIZE):
+
     nii_files = glob.glob("data/**/*.nii", recursive=True)
-    nii_files=np.array(nii_files)
+    nii_files = np.array(nii_files)
 
-    dataset  = tf.data.Dataset.from_tensor_slices(nii_files)
     AUTOTUNE = tf.data.AUTOTUNE
-    dataset  = dataset.map( lambda x: tf.numpy_function(func=get_nii_file, inp=[x], Tout=tf.float64), 
-                            num_parallel_calls=AUTOTUNE, deterministic=False)
-    dataset  = dataset.map(add_noise, num_parallel_calls=AUTOTUNE, deterministic=False)
-    dataset  = dataset.map( lambda x: tf.numpy_function(func=get_low_res, inp=[x], Tout=(tf.float64, tf.float64)),
-                             num_parallel_calls=AUTOTUNE, deterministic=False)
-    dataset  = dataset.map(normalize, num_parallel_calls=AUTOTUNE, deterministic=False)
-    dataset  = dataset.map( lambda x,y: tf.numpy_function(func=extract_patch, inp=[x,y], Tout=(tf.float64, tf.float64)),
-                             num_parallel_calls=AUTOTUNE, deterministic=False)
-    
-    sample_image  = dataset.take(30).batch(1).cache('cache/sample_image')
-    for l,h in sample_image: # Iterating until all sample images are cached
+
+    # Data Pipeline
+    file_names        = tf.data.Dataset.from_tensor_slices(nii_files)
+    images            = file_names.map( lambda x: tf.numpy_function(func=get_nii_file, inp=[x],
+     Tout=tf.float64), num_parallel_calls=AUTOTUNE, deterministic=False)
+    images_w_noise    = images.map(add_noise, num_parallel_calls=AUTOTUNE, deterministic=False)
+    image_pairs       = images_w_noise.map( lambda x: tf.numpy_function(func=get_low_res, inp=[x],
+     Tout=(tf.float64, tf.float64)), num_parallel_calls=AUTOTUNE, deterministic=False)
+    norm_image_pairs  = image_pairs.map(normalize, num_parallel_calls=AUTOTUNE,
+     deterministic=False).cache('cache/normalized_image_pairs')
+    for lr_image, hr_image in norm_image_pairs: # Iterating until all images are cached
         pass
-    sample_image  = sample_image.shuffle(30).take(1).repeat().as_numpy_iterator()
-    dataset  = dataset.batch(BATCH_SIZE, drop_remainder=True)
+    norm_image_pairs  = norm_image_pairs.map( lambda x,y: tf.numpy_function(func=extract_patch,
+     inp=[x,y], Tout=(tf.float64, tf.float64)), num_parallel_calls=AUTOTUNE, deterministic=False)
 
-    dataset_size = dataset.cardinality().numpy()
-    train_data_threshold  = int(0.5*dataset_size) # 50% of the dataset
-    train_dataset = dataset.take(train_data_threshold).prefetch(AUTOTUNE)
 
-    remain_dataset = dataset.skip(train_data_threshold)
-    remain_dataset_size = remain_dataset.cardinality().numpy()
-    valid_data_threshold  = int(0.5*remain_dataset_size)
-    valid_dataset = remain_dataset.take(valid_data_threshold).take(3).cache('cache/validation_data_cache')
-    for l_batch,h_batch in valid_dataset: # Iterating until all validation data is cached
-        pass
+    dataset_size          = norm_image_pairs.cardinality().numpy()
+    train_data_threshold  = int(0.7*dataset_size) # 70% of the dataset
 
-    test_dataset  = remain_dataset.skip(valid_data_threshold).take(10).prefetch(AUTOTUNE)
+    # Training Data Pipeline
+    train_dataset = norm_image_pairs.take(train_data_threshold)
+    train_dataset = train_dataset.map(data_augmentation)
+    train_dataset = train_dataset.batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
+
+    remain_dataset        = norm_image_pairs.skip(train_data_threshold)
+    remain_dataset_size   = remain_dataset.cardinality().numpy()
+    valid_data_threshold  = int(0.5*remain_dataset_size) # 15% of the dataset
+
+    # Validation Data Pipeline
+    valid_dataset = remain_dataset.take(valid_data_threshold)
+    sample_image  = valid_dataset.batch(1).repeat().as_numpy_iterator()
+    valid_dataset = valid_dataset.batch(BATCH_SIZE, drop_remainder=True)
+
+    # Test Data Pipeline
+    test_dataset = remain_dataset.skip(valid_data_threshold)
+    test_dataset = test_dataset.batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
 
     return train_dataset, sample_image, valid_dataset, test_dataset

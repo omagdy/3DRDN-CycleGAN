@@ -69,6 +69,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
 
     N_TRAINING_DATA   = train_dataset.cardinality().numpy()*BATCH_SIZE
     N_VALIDATION_DATA = valid_dataset.cardinality().numpy()*BATCH_SIZE
+    valid_dataset = valid_dataset.repeat().as_numpy_iterator()
     N_TESTING_DATA    = test_dataset.cardinality().numpy()*BATCH_SIZE
     
     nu_data_log = "Number of Training Data: {}, Number of Validation Data: {}, Number of Testing Data: {}".format(N_TRAINING_DATA, N_VALIDATION_DATA, N_TESTING_DATA)
@@ -81,7 +82,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
         
     #Initial Random Slice Image Generation
     generate_random_image_slice(sample_image, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")
-    va_psnr, va_ssim, va_error = evaluation_loop(valid_dataset, PATCH_SIZE)
+    va_psnr, va_ssim, va_error = evaluation_loop([next(valid_dataset)], PATCH_SIZE)
 
     evaluation_log = "Before training: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
     log(evaluation_log)    
@@ -103,7 +104,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
                 
         #Validation
         generate_random_image_slice(sample_image, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
-        va_psnr, va_ssim, va_error = evaluation_loop(valid_dataset, PATCH_SIZE)
+        va_psnr, va_ssim, va_error = evaluation_loop([next(valid_dataset)], PATCH_SIZE)
 
         with m.summary_writer.as_default():
             tf.summary.scalar('Validation PSNR', va_psnr, step=epoch)
