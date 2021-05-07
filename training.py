@@ -44,7 +44,7 @@ def evaluation_loop(dataset, PATCH_SIZE):
 
 
 def generate_random_image_slice(sample_image, PATCH_SIZE, str1, str2=""):
-    comparison_image_lr, comparison_image_hr = next(sample_image)
+    comparison_image_lr, comparison_image_hr = sample_image
     prediction_image    = tf.squeeze(m.generator_g(comparison_image_lr, training=False)).numpy()
     comparison_image_lr = tf.squeeze(comparison_image_lr).numpy()
     comparison_image_hr = tf.squeeze(comparison_image_hr).numpy()
@@ -62,14 +62,14 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
     training_start = time.time()
 
     log("Setting up Data Pipeline")
-    train_dataset, sample_image, valid_dataset, test_dataset = get_preprocessed_data(BATCH_SIZE)
+    train_dataset, valid_dataset, test_dataset = get_preprocessed_data(BATCH_SIZE)
     pipeline_seconds = time.time() - training_start
     pipeline_t_log = "Pipeline took {} to set up".format(datetime.timedelta(seconds=pipeline_seconds))
     log(pipeline_t_log)
 
     N_TRAINING_DATA   = train_dataset.cardinality().numpy()*BATCH_SIZE
     N_VALIDATION_DATA = valid_dataset.cardinality().numpy()*BATCH_SIZE
-    valid_dataset = valid_dataset.repeat().as_numpy_iterator()
+    valid_dataset = valid_dataset.repeat().prefetch(1).as_numpy_iterator()
     N_TESTING_DATA    = test_dataset.cardinality().numpy()*BATCH_SIZE
     
     nu_data_log = "Number of Training Data: {}, Number of Validation Data: {}, Number of Testing Data: {}".format(N_TRAINING_DATA, N_VALIDATION_DATA, N_TESTING_DATA)
@@ -81,8 +81,10 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
      TRAIN_ONLY=TRAIN_ONLY)
         
     #Initial Random Slice Image Generation
+    valid_batch = [next(valid_dataset)]
+    va_psnr, va_ssim, va_error = evaluation_loop(valid_batch, PATCH_SIZE)
+    sample_image = (valid_batch[0][0][0], valid_batch[0][1][0])
     generate_random_image_slice(sample_image, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")
-    va_psnr, va_ssim, va_error = evaluation_loop([next(valid_dataset)], PATCH_SIZE)
 
     evaluation_log = "Before training: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
     log(evaluation_log)    
@@ -103,8 +105,10 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
             return
                 
         #Validation
-        generate_random_image_slice(sample_image, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
-        va_psnr, va_ssim, va_error = evaluation_loop([next(valid_dataset)], PATCH_SIZE)
+        valid_batch = [next(valid_dataset)]
+        va_psnr, va_ssim, va_error = evaluation_loop(valid_batch, PATCH_SIZE)
+        sample_image = (valid_batch[0][0][0], valid_batch[0][1][0])
+        generate_random_image_slice(sample_image, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")
 
         with m.summary_writer.as_default():
             tf.summary.scalar('Validation PSNR', va_psnr, step=epoch)

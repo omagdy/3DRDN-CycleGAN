@@ -113,11 +113,10 @@ def get_preprocessed_data(BATCH_SIZE):
 
     # Validation Data Pipeline
     valid_dataset = remain_dataset.take(valid_data_threshold)
-    sample_image  = valid_dataset.batch(1).repeat().as_numpy_iterator()
     valid_dataset = valid_dataset.batch(BATCH_SIZE, drop_remainder=True)
 
     # Test Data Pipeline
     test_dataset = remain_dataset.skip(valid_data_threshold)
     test_dataset = test_dataset.batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
 
-    return train_dataset, sample_image, valid_dataset, test_dataset
+    return train_dataset, valid_dataset, test_dataset
