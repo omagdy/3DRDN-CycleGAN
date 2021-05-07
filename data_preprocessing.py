@@ -77,7 +77,7 @@ def extract_patch(lr_image, hr_image):
     lr_random_patch = lr_image[r_x:r_x+PATCH_SIZE,r_y:r_y+PATCH_SIZE,r_z:r_z+PATCH_SIZE]
     return tf.expand_dims(lr_random_patch, axis=3), tf.expand_dims(hr_random_patch, axis=3)
 
-def get_preprocessed_data(BATCH_SIZE):
+def get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE):
 
     nii_files = glob.glob("data/**/*.nii", recursive=True)
     nii_files = np.array(nii_files)
@@ -113,7 +113,7 @@ def get_preprocessed_data(BATCH_SIZE):
 
     # Validation Data Pipeline
     valid_dataset = remain_dataset.take(valid_data_threshold)
-    valid_dataset = valid_dataset.batch(BATCH_SIZE, drop_remainder=True)
+    valid_dataset = valid_dataset.batch(VALIDATION_BATCH_SIZE)
 
     # Test Data Pipeline
     test_dataset = remain_dataset.skip(valid_data_threshold)
