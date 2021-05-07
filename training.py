@@ -46,7 +46,6 @@ def evaluation_loop(dataset, PATCH_SIZE):
 def generate_random_image_slice(sample_image, PATCH_SIZE, str1, str2=""):
     comparison_image_lr, comparison_image_hr = sample_image
     comparison_image_lr = tf.expand_dims(comparison_image_lr, axis=0)
-    comparison_image_hr = tf.expand_dims(comparison_image_hr, axis=0)
     prediction_image    = tf.squeeze(m.generator_g(comparison_image_lr, training=False)).numpy()
     comparison_image_lr = tf.squeeze(comparison_image_lr).numpy()
     comparison_image_hr = tf.squeeze(comparison_image_hr).numpy()
@@ -64,7 +63,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
     training_start = time.time()
 
     log("Setting up Data Pipeline")
-    VALIDATION_BATCH_SIZE = 3
+    VALIDATION_BATCH_SIZE = 5
     train_dataset, valid_dataset, test_dataset = get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE)
     pipeline_seconds = time.time() - training_start
     pipeline_t_log = "Pipeline took {} to set up".format(datetime.timedelta(seconds=pipeline_seconds))
@@ -112,7 +111,7 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
         valid_batch = [next(valid_dataset)]
         va_psnr, va_ssim, va_error = evaluation_loop(valid_batch, PATCH_SIZE)
         sample_image = (valid_batch[0][0][0], valid_batch[0][1][0])
-        generate_random_image_slice(sample_image, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")
+        generate_random_image_slice(sample_image, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
 
         with m.summary_writer.as_default():
             tf.summary.scalar('Validation PSNR', va_psnr, step=epoch)

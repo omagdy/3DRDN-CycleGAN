@@ -113,7 +113,7 @@ def get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE):
 
     # Validation Data Pipeline
     valid_dataset = remain_dataset.take(valid_data_threshold)
-    valid_dataset = valid_dataset.batch(VALIDATION_BATCH_SIZE)
+    valid_dataset = valid_dataset.batch(VALIDATION_BATCH_SIZE, drop_remainder=True)
 
     # Test Data Pipeline
     test_dataset = remain_dataset.skip(valid_data_threshold)
