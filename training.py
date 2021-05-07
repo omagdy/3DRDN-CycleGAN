@@ -45,6 +45,8 @@ def evaluation_loop(dataset, PATCH_SIZE):
 
 def generate_random_image_slice(sample_image, PATCH_SIZE, str1, str2=""):
     comparison_image_lr, comparison_image_hr = sample_image
+    comparison_image_lr = tf.expand_dims(comparison_image_lr, axis=0)
+    comparison_image_hr = tf.expand_dims(comparison_image_hr, axis=0)
     prediction_image    = tf.squeeze(m.generator_g(comparison_image_lr, training=False)).numpy()
     comparison_image_lr = tf.squeeze(comparison_image_lr).numpy()
     comparison_image_hr = tf.squeeze(comparison_image_hr).numpy()
