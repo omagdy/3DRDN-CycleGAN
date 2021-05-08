@@ -52,11 +52,11 @@ def get_nii_file(nii_file_path):
 @tf.function
 def add_noise(hr_image):
     blurred_image = tfa.image.gaussian_filter2d(hr_image, sigma=GAUSSIAN_NOISE)
-    return blurred_image
+    return blurred_image, hr_image
 
-def get_low_res(hr_image):
-    x, y, z = hr_image.shape
-    lr_image   = tf.image.resize(hr_image, [x//SCALING_FACTOR, y//SCALING_FACTOR], method=interpolation_method).numpy()
+def get_low_res(blurred_image, hr_image):
+    x, y, z = blurred_image.shape
+    lr_image   = tf.image.resize(blurred_image, [x//SCALING_FACTOR, y//SCALING_FACTOR], method=interpolation_method).numpy()
     lr_image = np.rot90(lr_image, axes=(1,2))
     lr_image = tf.image.resize(lr_image, [x//SCALING_FACTOR, z//SCALING_FACTOR], method=interpolation_method).numpy()
     ups_lr_image = tf.image.resize(lr_image, [x//SCALING_FACTOR, z], method=interpolation_method).numpy()
@@ -89,7 +89,7 @@ def get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE):
     images            = file_names.map( lambda x: tf.numpy_function(func=get_nii_file, inp=[x],
      Tout=tf.float64), num_parallel_calls=AUTOTUNE, deterministic=False)
     images_w_noise    = images.map(add_noise, num_parallel_calls=AUTOTUNE, deterministic=False)
-    image_pairs       = images_w_noise.map( lambda x: tf.numpy_function(func=get_low_res, inp=[x],
+    image_pairs       = images_w_noise.map( lambda x,y: tf.numpy_function(func=get_low_res, inp=[x,y],
      Tout=(tf.float64, tf.float64)), num_parallel_calls=AUTOTUNE, deterministic=False)
     norm_image_pairs  = image_pairs.map(normalize, num_parallel_calls=AUTOTUNE,
      deterministic=False).cache('cache/normalized_image_pairs')
