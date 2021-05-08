@@ -113,10 +113,10 @@ def main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
         sample_image = (valid_batch[0][0][0], valid_batch[0][1][0])
         generate_random_image_slice(sample_image, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
 
-        with m.summary_writer.as_default():
-            tf.summary.scalar('Validation PSNR', va_psnr, step=epoch)
-            tf.summary.scalar('Validation SSIM', va_ssim, step=epoch)
-            tf.summary.scalar('Validation Error', va_error, step=epoch)
+        with m.summary_writer_valid.as_default():
+            tf.summary.scalar('Mean Absolute Error', va_error, step=epoch)
+            tf.summary.scalar('PSNR', va_psnr, step=epoch)
+            tf.summary.scalar('SSIM', va_ssim, step=epoch)
         
         #Epoch Logging
         log("Finished epoch {} at {}.".format(epoch, time.ctime()))

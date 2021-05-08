@@ -125,7 +125,8 @@ class Model3DRLDSRN:
         self.MODEL                 = MODEL
         self.CRIT_ITER             = CRIT_ITER
         self.TRAIN_ONLY            = TRAIN_ONLY
-        self.summary_writer = tf.summary.create_file_writer("plots")
+        self.summary_writer_train  = tf.summary.create_file_writer("plots/training")
+        self.summary_writer_valid  = tf.summary.create_file_writer("plots/validation")
         gen                        = Generator(PATCH_SIZE=PATCH_SIZE)
         self.generator_g           = gen.create_generator()
         self.generator_g_optimizer = tf.keras.optimizers.Adam(LR_G)
@@ -212,8 +213,9 @@ class Model3DRLDSRN:
             gen_g_super_loss   = supervised_loss(real_y, fake_y)
         gradients_of_generator = tape.gradient(gen_g_super_loss, self.generator_g.trainable_variables)
         self.generator_g_optimizer.apply_gradients(zip(gradients_of_generator, self.generator_g.trainable_variables))
-        with self.summary_writer.as_default():
-            tf.summary.scalar('Generator G Supervised Loss', gen_g_super_loss, step=epoch)
+        with self.summary_writer_train.as_default():
+            tf.summary.scalar('Generator G Total Loss', gen_g_super_loss, step=epoch)
+            tf.summary.scalar('Mean Absolute Error', gen_g_super_loss, step=epoch)
 
     @tf.function
     def gen_f_supervised_train_step(self, real_x, real_y, epoch):
@@ -222,8 +224,8 @@ class Model3DRLDSRN:
             gen_f_super_loss   = supervised_loss(real_x, fake_x)
         gradients_of_generator = tape.gradient(gen_f_super_loss, self.generator_f.trainable_variables)
         self.generator_f_optimizer.apply_gradients(zip(gradients_of_generator, self.generator_f.trainable_variables))
-        with self.summary_writer.as_default():
-            tf.summary.scalar('Generator F Supervised Loss', gen_f_super_loss, step=epoch)
+        with self.summary_writer_train.as_default():
+            tf.summary.scalar('Generator F Total Loss', gen_f_super_loss, step=epoch)
 
     @tf.function
     def gen_g_gan_train_step(self, real_x, real_y, epoch):
@@ -235,9 +237,10 @@ class Model3DRLDSRN:
             total_gen_g_loss = gen_g_super_loss + gen_g_adv_loss
         generator_g_gradient = tape.gradient(total_gen_g_loss, self.generator_g.trainable_variables)
         self.generator_g_optimizer.apply_gradients(zip(generator_g_gradient, self.generator_g.trainable_variables))
-        with self.summary_writer.as_default():
+        with self.summary_writer_train.as_default():
             tf.summary.scalar('Generator G Total Loss', total_gen_g_loss, step=epoch)
             tf.summary.scalar('Generator G Adversarial Loss', gen_g_adv_loss, step=epoch)
+            tf.summary.scalar('Mean Absolute Error', gen_g_super_loss, step=epoch)
 
     @tf.function
     def gen_cycle_train_step(self, real_x, real_y, epoch):
@@ -268,11 +271,12 @@ class Model3DRLDSRN:
         generator_f_gradient = tape.gradient(total_gen_f_loss, self.generator_f.trainable_variables)
         self.generator_g_optimizer.apply_gradients(zip(generator_g_gradient, self.generator_g.trainable_variables))
         self.generator_f_optimizer.apply_gradients(zip(generator_f_gradient, self.generator_f.trainable_variables))
-        with self.summary_writer.as_default():
+        with self.summary_writer_train.as_default():
             tf.summary.scalar('Generator G Total Loss', total_gen_g_loss, step=epoch)
             tf.summary.scalar('Generator G Adversarial Loss', gen_g_adv_loss, step=epoch)
             tf.summary.scalar('Generator G Cycle Consistency Loss', gen_g_cycle_loss, step=epoch)
             tf.summary.scalar('Generator G Identity Loss', gen_g_ident_loss, step=epoch)
+            tf.summary.scalar('Mean Absolute Error', gen_g_super_loss, step=epoch)
             tf.summary.scalar('Generator F Total Loss', total_gen_f_loss, step=epoch)
 
     @tf.function
@@ -293,9 +297,8 @@ class Model3DRLDSRN:
             total_disc_y_loss    = disc_y_loss + self.lambda_grad_pen*gradient_penalty_y
         discriminator_y_gradient = tape.gradient(total_disc_y_loss, self.discriminator_y.trainable_variables)
         self.discriminator_y_optimizer.apply_gradients(zip(discriminator_y_gradient, self.discriminator_y.trainable_variables))
-        with self.summary_writer.as_default():
-            tf.summary.scalar('Discriminator Y Total Loss', total_disc_y_loss, step=epoch)
-            tf.summary.scalar('Discriminator Y Adversarial Loss', disc_y_loss, step=epoch)
+        with self.summary_writer_train.as_default():
+            tf.summary.scalar('Discriminator Y Loss', total_disc_y_loss, step=epoch)
 
     @tf.function
     def disc_x_train_step(self, real_x, real_y, epoch):
@@ -315,8 +318,8 @@ class Model3DRLDSRN:
             total_disc_x_loss    = disc_x_loss + self.lambda_grad_pen*gradient_penalty_x
         discriminator_x_gradient = tape.gradient(total_disc_x_loss, self.discriminator_x.trainable_variables)
         self.discriminator_x_optimizer.apply_gradients(zip(discriminator_x_gradient, self.discriminator_x.trainable_variables))
-        with self.summary_writer.as_default():
-            tf.summary.scalar('Discriminator X Total Loss', total_disc_x_loss, step=epoch)
+        with self.summary_writer_train.as_default():
+            tf.summary.scalar('Discriminator X Loss', total_disc_x_loss, step=epoch)
 
     def training(self, real_x, real_y, epoch):
         if self.MODEL=="3DRLDSRN":
