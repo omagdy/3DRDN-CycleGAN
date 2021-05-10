@@ -1,23 +1,23 @@
+from training import main_loop
 from arg_parser import training_parser
-from training import training_loop
 
 def main():
 	args = training_parser().parse_args()
 
-	LR_G                  = args.learning_rate
+	LR                    = args.learning_rate
+	MODEL                 = args.model
 	EPOCHS                = args.epochs
-	LOSS_FUNC             = args.loss_type
+	CRIT_ITER             = args.crit_iter
 	BATCH_SIZE            = args.batch_size
+	LAMBDA_ADV            = args.lambda_adv
+	LAMBDA_IDT            = args.lambda_idt
+	LAMBDA_CYC            = args.lambda_cyc
+	TRAIN_ONLY            = args.train_only
 	EPOCH_START           = args.epoch_start
-	N_TRAINING_DATA       = args.n_training_data
+	LAMBDA_GRD_PEN        = args.lambda_grd_pen
 
-	K                     = args.growth_rate
-	UTILIZE_BIAS          = args.utilize_bias
-	NO_OF_DENSE_BLOCKS    = args.no_of_dense_blocks
-	NO_OF_UNITS_PER_BLOCK = args.no_of_units_per_block
-
-	training_loop(LR_G, EPOCHS, BATCH_SIZE, N_TRAINING_DATA, LOSS_FUNC, EPOCH_START,
-	 NO_OF_DENSE_BLOCKS, K, NO_OF_UNITS_PER_BLOCK, UTILIZE_BIAS)
+	main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
+	 LAMBDA_CYC, LAMBDA_IDT, CRIT_ITER, TRAIN_ONLY, MODEL)
 
 
 if __name__ == '__main__':
