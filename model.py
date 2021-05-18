@@ -15,7 +15,7 @@ class Generator:
                             "RELU"          : tf.keras.layers.ReLU(),
                             "ELU"           : tf.keras.layers.ELU(),}
     
-    def __init__(self, PATCH_SIZE=40, NO_OF_DENSE_BLOCKS=2, K=12, NO_OF_UNITS_PER_BLOCK=3,
+    def __init__(self, PATCH_SIZE=40, NO_OF_DENSE_BLOCKS=3, K=12, NO_OF_UNITS_PER_BLOCK=4,
                  UTILIZE_BIAS=True, WEIGHTS_INIT="HeUniform", ACTIVATION_FUNC="LEAKYRELU"):
         self.K                     = K
         self.PATCH_SIZE            = PATCH_SIZE
@@ -27,7 +27,7 @@ class Generator:
 
         self.filter_size               = 3
         self.bottleneck_filter_size    = 1
-        self.bottleneck_filter_number  = 4*self.K
+        self.bottleneck_filter_number  = 4*K
         self.compressor_filter_size    = 1
         self.first_conv_filter_number  = 2*K
         self.compressor_filter_number  = 2*K
@@ -119,7 +119,7 @@ class Discriminator:
 
 class Model3DRLDSRN:
 
-    def __init__(self, PATCH_SIZE=40, BATCH_SIZE=6, LR_G=1e-4, LR_D=1e-4, LAMBDA_ADV=0.01,
+    def __init__(self, PATCH_SIZE=40, DB=3, DU=4, BATCH_SIZE=6, LR_G=1e-4, LR_D=1e-4, LAMBDA_ADV=0.01,
      LAMBDA_GRD_PEN=10, LAMBDA_CYC=0.01, LAMBDA_IDT=0.005, MODEL="3DRLDSRN", CRIT_ITER=3, TRAIN_ONLY=''):
         assert(MODEL in ["3DRLDSRN", "WGANGP-3DRLDSRN", "CYCLE-WGANGP-3DRLDSRN"])
         self.MODEL                 = MODEL
@@ -127,7 +127,7 @@ class Model3DRLDSRN:
         self.TRAIN_ONLY            = TRAIN_ONLY
         self.summary_writer_train  = tf.summary.create_file_writer("plots/training")
         self.summary_writer_valid  = tf.summary.create_file_writer("plots/validation")
-        gen                        = Generator(PATCH_SIZE=PATCH_SIZE)
+        gen                        = Generator(PATCH_SIZE=PATCH_SIZE, NO_OF_DENSE_BLOCKS=DB, NO_OF_UNITS_PER_BLOCK=DU)
         self.generator_g           = gen.create_generator()
         self.generator_g_optimizer = tf.keras.optimizers.Adam(LR_G)
         self.load_generator_g()
