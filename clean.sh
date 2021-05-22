@@ -1,6 +1,7 @@
 #!/bin/bash
-rm plots/*
 rm training.log
+rm plots/training/*
+rm plots/validation/*
 rm generated_images/*
 rm tensor_checkpoints/generator_checkpoint/G/*
 rm tensor_checkpoints/generator_checkpoint/F/*

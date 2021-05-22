@@ -5,6 +5,8 @@ def main():
 	args = training_parser().parse_args()
 
 	LR                    = args.learning_rate
+	DB                    = args.dense_blocks
+	DU                    = args.dense_units
 	MODEL                 = args.model
 	EPOCHS                = args.epochs
 	CRIT_ITER             = args.crit_iter
@@ -16,7 +18,7 @@ def main():
 	EPOCH_START           = args.epoch_start
 	LAMBDA_GRD_PEN        = args.lambda_grd_pen
 
-	main_loop(LR, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
+	main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GRD_PEN,
 	 LAMBDA_CYC, LAMBDA_IDT, CRIT_ITER, TRAIN_ONLY, MODEL)
 
 
