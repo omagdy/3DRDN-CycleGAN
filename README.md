@@ -1,4 +1,4 @@
-# 3DRLD-SRN
+# 3DRLN
 ## Introduction
 This project is a work in progress that utilizes deep CNNs to perform super resolution on 3D models from CT/MRI scans.
 

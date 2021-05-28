@@ -117,11 +117,11 @@ class Discriminator:
         return tf.keras.Model(inputs=inputs, outputs=output)
 
 
-class Model3DRLDSRN:
+class Model3DRLN:
 
     def __init__(self, PATCH_SIZE=40, DB=3, DU=4, BATCH_SIZE=6, LR_G=1e-4, LR_D=1e-4, LAMBDA_ADV=0.01,
-     LAMBDA_GRD_PEN=10, LAMBDA_CYC=0.01, LAMBDA_IDT=0.005, MODEL="3DRLDSRN", CRIT_ITER=3, TRAIN_ONLY=''):
-        assert(MODEL in ["3DRLDSRN", "WGANGP-3DRLDSRN", "CYCLE-WGANGP-3DRLDSRN"])
+     LAMBDA_GRD_PEN=10, LAMBDA_CYC=0.01, LAMBDA_IDT=0.005, MODEL="3DRLN", CRIT_ITER=3, TRAIN_ONLY=''):
+        assert(MODEL in ["3DRLN", "3DRLN-WGAN", "3DRLN-CGAN"])
         self.MODEL                 = MODEL
         self.CRIT_ITER             = CRIT_ITER
         self.TRAIN_ONLY            = TRAIN_ONLY
@@ -131,7 +131,7 @@ class Model3DRLDSRN:
         self.generator_g           = gen.create_generator()
         self.generator_g_optimizer = tf.keras.optimizers.Adam(LR_G)
         self.load_generator_g()
-        if MODEL=="3DRLDSRN":
+        if MODEL=="3DRLN":
             return
         disc                           = Discriminator(PATCH_SIZE=PATCH_SIZE)
         self.discriminator_y           = disc.create_discriminator()
@@ -140,9 +140,9 @@ class Model3DRLDSRN:
         self.lambda_grad_pen           = LAMBDA_GRD_PEN
         self.alpha = tf.random.uniform([BATCH_SIZE, 1, 1, 1, 1], 0, 1, dtype='float64')
         self.load_discriminator_y()
-        if MODEL=="WGANGP-3DRLDSRN": 
+        if MODEL=="3DRLN-WGAN": 
             return
-        elif MODEL=="CYCLE-WGANGP-3DRLDSRN":
+        else:
             self.generator_f               = gen.create_generator()
             self.generator_f_optimizer     = tf.keras.optimizers.Adam(LR_G)
             self.discriminator_x           = disc.create_discriminator()
@@ -193,13 +193,13 @@ class Model3DRLDSRN:
     def save_models(self, epoch):
         ckpt_save_path = self.gen_g_ckpt_manager.save()
         log('Saving Generator G checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
-        if self.MODEL=="3DRLDSRN":
+        if self.MODEL=="3DRLN":
             return
         ckpt_save_path = self.disc_y_ckpt_manager.save()
         log('Saving Discriminator Y checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
-        if self.MODEL=="WGANGP-3DRLDSRN":
+        if self.MODEL=="3DRLN-WGAN":
             return
-        elif self.MODEL=="CYCLE-WGANGP-3DRLDSRN":
+        elif self.MODEL=="3DRLN-CGAN":
             ckpt_save_path = self.gen_f_ckpt_manager.save()
             log('Saving Generator F checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
             ckpt_save_path = self.disc_x_ckpt_manager.save()
@@ -322,10 +322,10 @@ class Model3DRLDSRN:
             tf.summary.scalar('Discriminator X Loss', total_disc_x_loss, step=epoch)
 
     def training(self, real_x, real_y, epoch):
-        if self.MODEL=="3DRLDSRN":
+        if self.MODEL=="3DRLN":
             self.gen_g_supervised_train_step(real_x, real_y, epoch)
             return
-        elif self.MODEL=="WGANGP-3DRLDSRN":
+        elif self.MODEL=="3DRLN-WGAN":
             if self.TRAIN_ONLY=="DISCRIMINATORS":
                 self.disc_y_train_step(real_x, real_y, epoch)
                 return
@@ -334,7 +334,7 @@ class Model3DRLDSRN:
                     self.disc_y_train_step(real_x, real_y, epoch)
                 self.gen_g_gan_train_step(real_x, real_y, epoch)
                 return
-        elif self.MODEL=="CYCLE-WGANGP-3DRLDSRN":
+        elif self.MODEL=="3DRLN-CGAN":
             if self.TRAIN_ONLY=="GENERATORS":
                 self.gen_g_supervised_train_step(real_x, real_y, epoch)
                 self.gen_f_supervised_train_step(real_x, real_y, epoch)
