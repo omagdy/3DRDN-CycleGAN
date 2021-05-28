@@ -28,6 +28,6 @@ def training_parser():
                          type=str, choices=['', 'GENERATORS', 'DISCRIMINATORS'],
                          help=('Select to only train either generators or discriminators.'))
     parser.add_argument('-mo', '--model', action='store', default='3DRLN', 
-                         type=str, choices=['3DRLN', '3DRLN-WGAN', '3DRLN-CGAN'],
+                         type=str, choices=['3DRLN', '3DRLN-WGAN', '3DRLN-CGAN', '3DRLN-UCGAN'],
                          help=('Model used during training. Default: 3DRLN'))
     return parser

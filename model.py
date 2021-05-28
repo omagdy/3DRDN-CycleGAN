@@ -121,7 +121,7 @@ class Model3DRLN:
 
     def __init__(self, PATCH_SIZE=40, DB=3, DU=4, BATCH_SIZE=6, LR_G=1e-4, LR_D=1e-4, LAMBDA_ADV=0.01,
      LAMBDA_GRD_PEN=10, LAMBDA_CYC=0.01, LAMBDA_IDT=0.005, MODEL="3DRLN", CRIT_ITER=3, TRAIN_ONLY=''):
-        assert(MODEL in ["3DRLN", "3DRLN-WGAN", "3DRLN-CGAN"])
+        assert(MODEL in ["3DRLN", "3DRLN-WGAN", "3DRLN-CGAN", "3DRLN-UCGAN"])
         self.MODEL                 = MODEL
         self.CRIT_ITER             = CRIT_ITER
         self.TRAIN_ONLY            = TRAIN_ONLY
@@ -199,7 +199,7 @@ class Model3DRLN:
         log('Saving Discriminator Y checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
         if self.MODEL=="3DRLN-WGAN":
             return
-        elif self.MODEL=="3DRLN-CGAN":
+        else:
             ckpt_save_path = self.gen_f_ckpt_manager.save()
             log('Saving Generator F checkpoint for epoch {} at {}'.format(epoch, ckpt_save_path))
             ckpt_save_path = self.disc_x_ckpt_manager.save()
@@ -280,6 +280,40 @@ class Model3DRLN:
             tf.summary.scalar('Generator F Total Loss', total_gen_f_loss, step=epoch)
 
     @tf.function
+    def gen_unsupervised_cycle_train_step(self, real_x, real_y, epoch):
+        with tf.GradientTape(persistent=True) as tape:
+            fake_y           = self.generator_g(real_x, training=True)
+            disc_fake_y      = self.discriminator_y(fake_y, training=True)
+            cycled_x         = self.generator_f(fake_y, training=True)
+            same_y           = self.generator_g(real_y, training=True)
+
+            fake_x           = self.generator_f(real_y, training=True)
+            disc_fake_x      = self.discriminator_x(fake_x, training=True)
+            cycled_y         = self.generator_g(fake_x, training=True)
+            same_x           = self.generator_f(real_x, training=True)
+
+            gen_g_adv_loss   = self.lambda_adv*generator_loss(disc_fake_y)
+            gen_g_cycle_loss = self.lambda_cyc*cycle_loss(real_x, cycled_x)
+            gen_g_ident_loss = self.lambda_idt*identity_loss(real_y, same_y)
+
+            gen_f_adv_loss   = self.lambda_adv*generator_loss(disc_fake_x)
+            gen_f_cycle_loss = self.lambda_cyc*cycle_loss(real_y, cycled_y)
+            gen_f_ident_loss = self.lambda_idt*identity_loss(real_x, same_x)
+
+            total_gen_g_loss = gen_g_adv_loss + gen_g_cycle_loss + gen_g_ident_loss
+            total_gen_f_loss = gen_f_adv_loss + gen_f_cycle_loss + gen_f_ident_loss
+        generator_g_gradient = tape.gradient(total_gen_g_loss, self.generator_g.trainable_variables)
+        generator_f_gradient = tape.gradient(total_gen_f_loss, self.generator_f.trainable_variables)
+        self.generator_g_optimizer.apply_gradients(zip(generator_g_gradient, self.generator_g.trainable_variables))
+        self.generator_f_optimizer.apply_gradients(zip(generator_f_gradient, self.generator_f.trainable_variables))
+        with self.summary_writer_train.as_default():
+            tf.summary.scalar('Generator G Total Loss', total_gen_g_loss, step=epoch)
+            tf.summary.scalar('Generator G Adversarial Loss', gen_g_adv_loss, step=epoch)
+            tf.summary.scalar('Generator G Cycle Consistency Loss', gen_g_cycle_loss, step=epoch)
+            tf.summary.scalar('Generator G Identity Loss', gen_g_ident_loss, step=epoch)
+            tf.summary.scalar('Generator F Total Loss', total_gen_f_loss, step=epoch)
+
+    @tf.function
     def disc_y_train_step(self, real_x, real_y, epoch):
         with tf.GradientTape(persistent=True) as tape:
             fake_y         = self.generator_g(real_x, training=True)
@@ -334,7 +368,7 @@ class Model3DRLN:
                     self.disc_y_train_step(real_x, real_y, epoch)
                 self.gen_g_gan_train_step(real_x, real_y, epoch)
                 return
-        elif self.MODEL=="3DRLN-CGAN":
+        else:
             if self.TRAIN_ONLY=="GENERATORS":
                 self.gen_g_supervised_train_step(real_x, real_y, epoch)
                 self.gen_f_supervised_train_step(real_x, real_y, epoch)
@@ -347,5 +381,8 @@ class Model3DRLN:
                 for _ in range(self.CRIT_ITER):
                     self.disc_y_train_step(real_x, real_y, epoch)
                     self.disc_x_train_step(real_x, real_y, epoch)
-                self.gen_cycle_train_step(real_x, real_y, epoch)
+                if self.MODEL=="3DRLN-CGAN":
+                    self.gen_cycle_train_step(real_x, real_y, epoch)
+                elif self.MODEL=="3DRLN-UCGAN":
+                    self.gen_unsupervised_cycle_train_step(real_x, real_y, epoch)
                 return
