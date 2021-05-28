@@ -20,9 +20,9 @@ def get_random_patch_dims(image):
     x, y, z = image.shape[0], image.shape[1], image.shape[2]
     threshold = 0.30
     x_thr, y_thr, z_thr = int(x*threshold), int(y*threshold), int(z*threshold)
-    r_x = randint(x_thr, x-PATCH_SIZE-x_thr)
-    r_y = randint(y_thr, y-PATCH_SIZE-y_thr)
-    r_z = randint(z_thr, z-PATCH_SIZE-z_thr)
+    r_x = randint(x_thr-1, x-PATCH_SIZE-x_thr)
+    r_y = randint(y_thr-1, y-PATCH_SIZE-y_thr)
+    r_z = randint(z_thr-1, z-PATCH_SIZE-z_thr)
     return r_x, r_y, r_z
 
 def flip_model_x(model):
@@ -81,6 +81,7 @@ def get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE):
 
     nii_files = glob.glob("data/**/*.nii", recursive=True)
     nii_files = np.array(nii_files)
+    np.random.shuffle(nii_files)
 
     AUTOTUNE = tf.data.AUTOTUNE
 
