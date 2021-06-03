@@ -64,14 +64,10 @@ def main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GR
 
     log("Setting up Data Pipeline")
     VALIDATION_BATCH_SIZE = 5
-    train_dataset, valid_dataset, test_dataset = get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE)
+    train_dataset, N_TRAINING_DATA, valid_dataset, N_VALIDATION_DATA, test_dataset, N_TESTING_DATA = get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE)
     pipeline_seconds = time.time() - training_start
     pipeline_t_log = "Pipeline took {} to set up".format(datetime.timedelta(seconds=pipeline_seconds))
     log(pipeline_t_log)
-
-    N_TRAINING_DATA   = train_dataset.cardinality().numpy()*BATCH_SIZE
-    N_VALIDATION_DATA = valid_dataset.cardinality().numpy()*VALIDATION_BATCH_SIZE
-    N_TESTING_DATA    = test_dataset.cardinality().numpy()*BATCH_SIZE
     
     nu_data_log = "Number of Training Data: {}, Number of Validation Data: {}, Number of Testing Data: {}".format(N_TRAINING_DATA, N_VALIDATION_DATA, N_TESTING_DATA)
     log(nu_data_log)

@@ -107,17 +107,26 @@ def get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE):
     train_dataset = norm_image_pairs.take(train_data_threshold)
     train_dataset = train_dataset.map(data_augmentation)
     train_dataset = train_dataset.batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
+    train_dataset_size = train_dataset.cardinality().numpy()*BATCH_SIZE
 
     remain_dataset        = norm_image_pairs.skip(train_data_threshold)
     remain_dataset_size   = remain_dataset.cardinality().numpy()
     valid_data_threshold  = int(0.5*remain_dataset_size) # 15% of the dataset
 
     # Validation Data Pipeline
-    valid_dataset = remain_dataset.take(valid_data_threshold)
+    valid_dataset      = remain_dataset.take(valid_data_threshold)
+    valid_dataset_size = valid_dataset.cardinality().numpy()
+    if VALIDATION_BATCH_SIZE > valid_dataset_size:
+        VALIDATION_BATCH_SIZE = valid_dataset_size
     valid_dataset = valid_dataset.batch(VALIDATION_BATCH_SIZE, drop_remainder=True)
+    valid_dataset_size = valid_dataset.cardinality().numpy()*VALIDATION_BATCH_SIZE
 
     # Test Data Pipeline
-    test_dataset = remain_dataset.skip(valid_data_threshold)
+    test_dataset      = remain_dataset.skip(valid_data_threshold)
+    test_dataset_size = valid_dataset.cardinality().numpy()
+    if BATCH_SIZE > test_dataset_size:
+        BATCH_SIZE = test_dataset_size
     test_dataset = test_dataset.batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
+    test_dataset_size = test_dataset.cardinality().numpy()*BATCH_SIZE
 
-    return train_dataset, valid_dataset, test_dataset
+    return train_dataset, train_dataset_size, valid_dataset, valid_dataset_size, test_dataset, test_dataset_size
