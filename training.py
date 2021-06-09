@@ -63,7 +63,7 @@ def main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GR
     training_start = time.time()
 
     log("Setting up Data Pipeline")
-    VALIDATION_BATCH_SIZE = 5
+    VALIDATION_BATCH_SIZE = 3
     train_dataset, N_TRAINING_DATA, valid_dataset, N_VALIDATION_DATA, test_dataset, N_TESTING_DATA = get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE)
     pipeline_seconds = time.time() - training_start
     pipeline_t_log = "Pipeline took {} to set up".format(datetime.timedelta(seconds=pipeline_seconds))
@@ -72,7 +72,7 @@ def main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GR
     nu_data_log = "Number of Training Data: {}, Number of Validation Data: {}, Number of Testing Data: {}".format(N_TRAINING_DATA, N_VALIDATION_DATA, N_TESTING_DATA)
     log(nu_data_log)
 
-    valid_dataset = valid_dataset.repeat().prefetch(1).as_numpy_iterator()
+    valid_dataset = valid_dataset.repeat().as_numpy_iterator()
          
     global m
     m = Model3DRLN(PATCH_SIZE=PATCH_SIZE, DB=DB, DU=DU, BATCH_SIZE=BATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV,

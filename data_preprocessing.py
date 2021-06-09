@@ -10,19 +10,18 @@ PATCH_SIZE           = 40
 GAUSSIAN_NOISE       = 0.25
 SCALING_FACTOR       = 2
 interpolation_method = 'bicubic'
-
+BOUNDARY_VOXELS_1    = 70
+BOUNDARY_VOXELS_2    = BOUNDARY_VOXELS_1-PATCH_SIZE
 
 @tf.function
 def NormalizeImage(image):
     return (image - tf.math.reduce_min(image)) / (tf.math.reduce_max(image) - tf.math.reduce_min(image))
 
-def get_random_patch_dims(image):
-    x, y, z = image.shape[0], image.shape[1], image.shape[2]
-    threshold = 0.30
-    x_thr, y_thr, z_thr = int(x*threshold), int(y*threshold), int(z*threshold)
-    r_x = randint(x_thr-1, x-PATCH_SIZE-x_thr)
-    r_y = randint(y_thr-1, y-PATCH_SIZE-y_thr)
-    r_z = randint(z_thr-1, z-PATCH_SIZE-z_thr)
+@tf.function
+def get_random_patch_dims(image):    
+    r_x = tf.random.uniform((), BOUNDARY_VOXELS_1, tf.shape(image)[0]-PATCH_SIZE-BOUNDARY_VOXELS_2,'int32')
+    r_y = tf.random.uniform((), BOUNDARY_VOXELS_1, tf.shape(image)[1]-PATCH_SIZE-BOUNDARY_VOXELS_2,'int32')
+    r_z = tf.random.uniform((), BOUNDARY_VOXELS_1, tf.shape(image)[2]-PATCH_SIZE-BOUNDARY_VOXELS_2,'int32')
     return r_x, r_y, r_z
 
 def flip_model_x(model):
@@ -45,7 +44,7 @@ def data_augmentation(lr_image, hr_image):
     return lr_image, hr_image
 
 def get_nii_file(nii_file_path):
-    img_sitk = sitk.ReadImage(nii_file_path.decode('UTF-8'), sitk.sitkFloat64)
+    img_sitk = sitk.ReadImage(nii_file_path.decode('UTF-8'), sitk.sitkInt32)
     hr_image = sitk.GetArrayFromImage(img_sitk)
     return hr_image
 
@@ -62,7 +61,7 @@ def get_low_res(blurred_image, hr_image):
     ups_lr_image = tf.image.resize(lr_image, [x//SCALING_FACTOR, z], method=interpolation_method).numpy()
     ups_lr_image = np.rot90(ups_lr_image, axes=(1,2))
     ups_lr_image = tf.image.resize(ups_lr_image, [x, y], method=interpolation_method).numpy()
-    ups_lr_image = np.array(np.rot90(ups_lr_image, k=2, axes=(1,2)), dtype='float64')
+    ups_lr_image = np.array(np.rot90(ups_lr_image, k=2, axes=(1,2)), dtype='int32')
     return ups_lr_image, hr_image
 
 @tf.function
@@ -71,6 +70,7 @@ def normalize(lr_image, hr_image):
     lr_image = NormalizeImage(lr_image)
     return lr_image, hr_image
 
+@tf.function
 def extract_patch(lr_image, hr_image):
     r_x, r_y, r_z = get_random_patch_dims(hr_image)
     hr_random_patch = hr_image[r_x:r_x+PATCH_SIZE,r_y:r_y+PATCH_SIZE,r_z:r_z+PATCH_SIZE]
@@ -81,31 +81,26 @@ def get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE):
 
     nii_files = glob.glob("data/**/*.nii", recursive=True)
     nii_files = np.array(nii_files)
-    np.random.shuffle(nii_files)
 
     AUTOTUNE = tf.data.AUTOTUNE
 
     # Data Pipeline
-    file_names        = tf.data.Dataset.from_tensor_slices(nii_files)
+    file_names        = tf.data.Dataset.from_tensor_slices(nii_sample)
     images            = file_names.map( lambda x: tf.numpy_function(func=get_nii_file, inp=[x],
-     Tout=tf.float64), num_parallel_calls=AUTOTUNE, deterministic=False)
+     Tout=tf.int32), num_parallel_calls=AUTOTUNE, deterministic=False)
     images_w_noise    = images.map(add_noise, num_parallel_calls=AUTOTUNE, deterministic=False)
     image_pairs       = images_w_noise.map( lambda x,y: tf.numpy_function(func=get_low_res, inp=[x,y],
-     Tout=(tf.float64, tf.float64)), num_parallel_calls=AUTOTUNE, deterministic=False)
+         Tout=(tf.int32, tf.int32)), num_parallel_calls=AUTOTUNE, deterministic=False)
     norm_image_pairs  = image_pairs.map(normalize, num_parallel_calls=AUTOTUNE,
-     deterministic=False).cache('cache/normalized_image_pairs')
-    for lr_image, hr_image in norm_image_pairs: # Iterating until all images are cached
-        pass
-    norm_image_pairs  = norm_image_pairs.map( lambda x,y: tf.numpy_function(func=extract_patch,
-     inp=[x,y], Tout=(tf.float64, tf.float64)), num_parallel_calls=AUTOTUNE, deterministic=False)
-
+     deterministic=False)
+    norm_image_pairs  = norm_image_pairs.map(extract_patch, num_parallel_calls=AUTOTUNE, deterministic=False)
 
     dataset_size          = norm_image_pairs.cardinality().numpy()
     train_data_threshold  = int(0.7*dataset_size) # 70% of the dataset
 
     # Training Data Pipeline
     train_dataset = norm_image_pairs.take(train_data_threshold)
-    train_dataset = train_dataset.map(data_augmentation)
+    train_dataset = train_dataset.map(data_augmentation, num_parallel_calls=AUTOTUNE, deterministic=False)
     train_dataset = train_dataset.batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
     train_dataset_size = train_dataset.cardinality().numpy()*BATCH_SIZE
 
@@ -116,16 +111,12 @@ def get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE):
     # Validation Data Pipeline
     valid_dataset      = remain_dataset.take(valid_data_threshold)
     valid_dataset_size = valid_dataset.cardinality().numpy()
-    if VALIDATION_BATCH_SIZE > valid_dataset_size:
-        VALIDATION_BATCH_SIZE = valid_dataset_size
     valid_dataset = valid_dataset.batch(VALIDATION_BATCH_SIZE, drop_remainder=True)
     valid_dataset_size = valid_dataset.cardinality().numpy()*VALIDATION_BATCH_SIZE
 
     # Test Data Pipeline
     test_dataset      = remain_dataset.skip(valid_data_threshold)
-    test_dataset_size = valid_dataset.cardinality().numpy()
-    if BATCH_SIZE > test_dataset_size:
-        BATCH_SIZE = test_dataset_size
+    test_dataset_size = test_dataset.cardinality().numpy()
     test_dataset = test_dataset.batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
     test_dataset_size = test_dataset.cardinality().numpy()*BATCH_SIZE
 
