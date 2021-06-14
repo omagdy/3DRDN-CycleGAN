@@ -8,7 +8,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 
 from logger import log
-from model import Model3DRLN
+from model import Model3DRDN
 from plotting import generate_images
 from loss_functions import supervised_loss, psnr_and_ssim_loss
 from data_preprocessing import get_preprocessed_data, PATCH_SIZE
@@ -75,7 +75,7 @@ def main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GR
     valid_dataset = valid_dataset.repeat().as_numpy_iterator()
          
     global m
-    m = Model3DRLN(PATCH_SIZE=PATCH_SIZE, DB=DB, DU=DU, BATCH_SIZE=BATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV,
+    m = Model3DRDN(PATCH_SIZE=PATCH_SIZE, DB=DB, DU=DU, BATCH_SIZE=BATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV,
      LAMBDA_GRD_PEN=LAMBDA_GRD_PEN, LAMBDA_CYC=LAMBDA_CYC, LAMBDA_IDT=LAMBDA_IDT, MODEL=MODEL, CRIT_ITER=CRIT_ITER,
      TRAIN_ONLY=TRAIN_ONLY)
         
