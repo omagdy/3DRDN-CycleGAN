@@ -10,7 +10,7 @@ PATCH_SIZE           = 40
 GAUSSIAN_NOISE       = 0.25
 SCALING_FACTOR       = 2
 interpolation_method = 'bicubic'
-BOUNDARY_VOXELS_1    = 70
+BOUNDARY_VOXELS_1    = 50
 BOUNDARY_VOXELS_2    = BOUNDARY_VOXELS_1-PATCH_SIZE
 
 @tf.function
@@ -85,7 +85,7 @@ def get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE):
     AUTOTUNE = tf.data.AUTOTUNE
 
     # Data Pipeline
-    file_names        = tf.data.Dataset.from_tensor_slices(nii_sample)
+    file_names        = tf.data.Dataset.from_tensor_slices(nii_files)
     images            = file_names.map( lambda x: tf.numpy_function(func=get_nii_file, inp=[x],
      Tout=tf.int32), num_parallel_calls=AUTOTUNE, deterministic=False)
     images_w_noise    = images.map(add_noise, num_parallel_calls=AUTOTUNE, deterministic=False)
