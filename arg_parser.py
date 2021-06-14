@@ -27,7 +27,7 @@ def training_parser():
     parser.add_argument('-to', '--train_only', action='store', default='', 
                          type=str, choices=['', 'GENERATORS', 'DISCRIMINATORS'],
                          help=('Select to only train either generators or discriminators.'))
-    parser.add_argument('-mo', '--model', action='store', default='3DRLDSRN', 
-                         type=str, choices=['3DRLDSRN', 'WGANGP-3DRLDSRN', 'CYCLE-WGANGP-3DRLDSRN'],
-                         help=('Model used during training. Default: 3DRLDSRN'))
+    parser.add_argument('-mo', '--model', action='store', default='3DRDN', 
+                         type=str, choices=['3DRDN', '3DRDN-WGAN', '3DRDN-CGAN', '3DRDN-UCGAN'],
+                         help=('Model used during training. Default: 3DRDN'))
     return parser

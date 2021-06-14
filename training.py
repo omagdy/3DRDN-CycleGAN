@@ -8,7 +8,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 
 from logger import log
-from model import Model3DRLDSRN
+from model import Model3DRDN
 from plotting import generate_images
 from loss_functions import supervised_loss, psnr_and_ssim_loss
 from data_preprocessing import get_preprocessed_data, PATCH_SIZE
@@ -31,16 +31,16 @@ def evaluation_loop(dataset, PATCH_SIZE):
         hr_data     = np.append(hr_data, hr_image , axis=0)
     output_data = tf.squeeze(output_data).numpy()
     hr_data     = tf.squeeze(hr_data).numpy()
-    errors = []
-    psnr  = tf.image.psnr(output_data, hr_data, 1)
-    psnr  = psnr[psnr!=float("inf")]
-    ssim  = tf.image.ssim(output_data, hr_data, 1)
-    for v in [psnr, ssim]:
-        v = tf.reduce_mean(v).numpy()
-        v  = round(v,3)
-        errors.append(v)
-    errors.append(round(supervised_loss(output_data, hr_data).numpy(),3))
-    return errors
+    mean_errors = []
+    std_errors  = []
+    psnr        = tf.image.psnr(output_data, hr_data, 1)
+    psnr        = psnr[psnr!=float("inf")]
+    ssim        = tf.image.ssim(output_data, hr_data, 1)
+    abs_err     = tf.math.abs(hr_data-output_data)
+    for v in [psnr, ssim, abs_err]:
+        mean_errors.append(round(tf.reduce_mean(v).numpy() ,3))
+        std_errors.append(round(tf.math.reduce_std(v).numpy() ,3))
+    return mean_errors, std_errors
 
 
 def generate_random_image_slice(sample_image, PATCH_SIZE, str1, str2=""):
@@ -63,33 +63,29 @@ def main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GR
     training_start = time.time()
 
     log("Setting up Data Pipeline")
-    VALIDATION_BATCH_SIZE = 5
-    train_dataset, valid_dataset, test_dataset = get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE)
+    VALIDATION_BATCH_SIZE = 3
+    train_dataset, N_TRAINING_DATA, valid_dataset, N_VALIDATION_DATA, test_dataset, N_TESTING_DATA = get_preprocessed_data(BATCH_SIZE, VALIDATION_BATCH_SIZE)
     pipeline_seconds = time.time() - training_start
     pipeline_t_log = "Pipeline took {} to set up".format(datetime.timedelta(seconds=pipeline_seconds))
     log(pipeline_t_log)
-
-    N_TRAINING_DATA   = train_dataset.cardinality().numpy()*BATCH_SIZE
-    N_VALIDATION_DATA = valid_dataset.cardinality().numpy()*VALIDATION_BATCH_SIZE
-    N_TESTING_DATA    = test_dataset.cardinality().numpy()*BATCH_SIZE
     
     nu_data_log = "Number of Training Data: {}, Number of Validation Data: {}, Number of Testing Data: {}".format(N_TRAINING_DATA, N_VALIDATION_DATA, N_TESTING_DATA)
     log(nu_data_log)
 
-    valid_dataset = valid_dataset.repeat().prefetch(1).as_numpy_iterator()
+    valid_dataset = valid_dataset.repeat().as_numpy_iterator()
          
     global m
-    m = Model3DRLDSRN(PATCH_SIZE=PATCH_SIZE, DB=DB, DU=DU, BATCH_SIZE=BATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV,
+    m = Model3DRDN(PATCH_SIZE=PATCH_SIZE, DB=DB, DU=DU, BATCH_SIZE=BATCH_SIZE, LR_G=LR, LR_D=LR, LAMBDA_ADV=LAMBDA_ADV,
      LAMBDA_GRD_PEN=LAMBDA_GRD_PEN, LAMBDA_CYC=LAMBDA_CYC, LAMBDA_IDT=LAMBDA_IDT, MODEL=MODEL, CRIT_ITER=CRIT_ITER,
      TRAIN_ONLY=TRAIN_ONLY)
         
     #Initial Random Slice Image Generation
     valid_batch = [next(valid_dataset)]
-    va_psnr, va_ssim, va_error = evaluation_loop(valid_batch, PATCH_SIZE)
+    (va_psnr, va_ssim, va_error), (va_psnr_std, va_ssim_std, va_error_std) = evaluation_loop(valid_batch, PATCH_SIZE)
     sample_image = (valid_batch[0][0][0], valid_batch[0][1][0])
     generate_random_image_slice(sample_image, PATCH_SIZE, 'a_first_plot_{}'.format(EPOCH_START), str2="")
 
-    evaluation_log = "Before training: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
+    evaluation_log = "Before training: MAE = "+str(va_error)+" ± "+str(va_error_std)+", PSNR = "+str(va_psnr)+" ± "+str(va_psnr_std)+", SSIM = "+str(va_ssim)+" ± "+str(va_ssim_std)
     log(evaluation_log)    
 
     for epoch in range(EPOCH_START, EPOCH_START+EPOCHS):
@@ -109,7 +105,7 @@ def main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GR
                 
         #Validation
         valid_batch = [next(valid_dataset)]
-        va_psnr, va_ssim, va_error = evaluation_loop(valid_batch, PATCH_SIZE)
+        (va_psnr, va_ssim, va_error), (va_psnr_std, va_ssim_std, va_error_std) = evaluation_loop(valid_batch, PATCH_SIZE)
         sample_image = (valid_batch[0][0][0], valid_batch[0][1][0])
         generate_random_image_slice(sample_image, PATCH_SIZE, "epoch_{}".format(epoch), str2=" Epoch: {}".format(epoch))
 
@@ -123,7 +119,7 @@ def main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GR
         epoch_seconds = time.time() - epoch_start
         epoch_t_log = "Epoch took {}".format(datetime.timedelta(seconds=epoch_seconds))
         log(epoch_t_log)
-        evaluation_log = "After epoch: Error = "+str(va_error)+", PSNR = "+str(va_psnr)+", SSIM = "+str(va_ssim)
+        evaluation_log = "After epoch: MAE = "+str(va_error)+" ± "+str(va_error_std)+", PSNR = "+str(va_psnr)+" ± "+str(va_psnr_std)+", SSIM = "+str(va_ssim)+" ± "+str(va_ssim_std)
         log(evaluation_log)
 
         if (epoch + 1) % 30 == 0:
@@ -133,10 +129,10 @@ def main_loop(LR, DB, DU, EPOCHS, BATCH_SIZE, EPOCH_START, LAMBDA_ADV, LAMBDA_GR
 
     #Testing
     generate_random_image_slice(sample_image, PATCH_SIZE, 'z_testing_plot_{}'.format(EPOCH_START))
-    test_psnr, test_ssim, test_error = evaluation_loop(test_dataset, PATCH_SIZE)
+    (test_psnr, test_ssim, test_error), (test_psnr_std, test_ssim_std, test_error_std) = evaluation_loop(test_dataset, PATCH_SIZE)
         
     #Training Cycle Meta Data Logging
-    evaluation_log = "After training: Error = "+str(test_error)+", PSNR = "+str(test_psnr)+", SSIM = "+str(test_ssim)
+    evaluation_log = "After training: MAE = "+str(test_error)+" ± "+str(test_error_std)+", PSNR = "+str(test_psnr)+" ± "+str(test_psnr_std)+", SSIM = "+str(test_ssim)+" ± "+str(test_ssim_std)
     log(evaluation_log)
     log("Finished training at {}".format(time.ctime()))
     training_seconds = time.time() - training_start
